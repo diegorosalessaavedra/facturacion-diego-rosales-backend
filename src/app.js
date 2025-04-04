@@ -31,6 +31,7 @@ import { huevosRouter } from './modules/productos/huevos/huevos.routes.js';
 import { ingresoHuevosRouter } from './modules/compras/ingresoHuevos/ingresoHuevos.routes.js';
 import { ventasHuevosRouter } from './modules/ventas/ventasHuevos/ventasHuevos.routes.js';
 import { cuentasBancariasRouter } from './modules/ajustes/cuentasBancarias/cuentasBancarias.routes.js';
+import { costosProduccionRouter } from './modules/costos/costosProduccion/costosProduccion.routes.js';
 
 const app = express();
 
@@ -103,10 +104,13 @@ app.use(
   '/api/v1/comprobantes/comprobante-electronico',
   comprobantesElectroincosRouter
 );
-
 app.use('/api/v1/comprobantes/notas-comprobantes', notasComprobantesRouter);
 //comprobantes
 
+//costos
+app.use('/api/v1/costos/costos-produccion', costosProduccionRouter);
+
+//costos
 app.all('*', (req, res, next) => {
   return next(
     new AppError(`Can't find ${req.originalUrl} on this server! 💀`, 404)

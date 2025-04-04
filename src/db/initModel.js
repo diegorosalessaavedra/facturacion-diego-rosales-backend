@@ -15,6 +15,7 @@ import { PagosComprobantesElectronicos } from '../modules/comprobantes/filesComp
 import { ProductosComprobanteElectronico } from '../modules/comprobantes/filesComprobanteElectronicos/productosComprobanteElectronico/productosComprobanteElectronico.model.js';
 import { NotasComprobante } from '../modules/comprobantes/filesNotasComprobante/notasComprobante/notasComprobante.model.js';
 import { ProductosNotasComprobante } from '../modules/comprobantes/filesNotasComprobante/productosNotasComprobante/productosNotasComprobante.model.js';
+import { CostosProduccion } from '../modules/costos/costosProduccion/costosProduccion.model.js';
 import { Huevos } from '../modules/productos/huevos/huevos.model.js';
 import { MisProductos } from '../modules/productos/misProductos/misProductos.model.js';
 import { SaldoInicialKardex } from '../modules/productos/saldoInicialKardex/saldoInicialKardex.model.js';
@@ -224,6 +225,16 @@ const initModel = () => {
   PagosIngresoHuevos.belongsTo(IngresoHuevos, {
     foreignKey: 'ingreso_huevo_id',
     as: 'ingreso_huevo',
+  });
+
+  IngresoHuevos.hasOne(CostosProduccion, {
+    foreignKey: 'ingreso_huevo_id',
+    as: 'costo_produccion',
+  });
+
+  CostosProduccion.belongsTo(IngresoHuevos, {
+    foreignKey: 'ingreso_huevo_id',
+    as: 'ingreso_huevos',
   });
 
   IngresoHuevos.hasMany(PagosIngresoHuevos, {

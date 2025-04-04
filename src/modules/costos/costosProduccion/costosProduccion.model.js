@@ -8,6 +8,11 @@ const CostosProduccion = db.define('costosProduccion', {
     allowNull: false,
     type: DataTypes.INTEGER,
   },
+  ingreso_huevo_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    unique: true,
+  },
   fecha_inicio: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -19,12 +24,10 @@ const CostosProduccion = db.define('costosProduccion', {
   mes: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
   },
   semana: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
   },
 
   alimento: {
@@ -51,9 +54,9 @@ const CostosProduccion = db.define('costosProduccion', {
     type: DataTypes.DECIMAL(20, 2),
     allowNull: false,
   },
-  otros: {
-    type: DataTypes.ARRAY.JSON,
-    allowNull: false,
+  otros_gastos: {
+    type: DataTypes.JSONB,
+    allowNull: true,
   },
   costo_produccion: {
     type: DataTypes.DECIMAL(20, 2),

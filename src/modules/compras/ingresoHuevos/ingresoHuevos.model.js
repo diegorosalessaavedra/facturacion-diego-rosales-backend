@@ -33,6 +33,14 @@ const IngresoHuevos = db.define('ingresoHuevos', {
     type: DataTypes.DECIMAL(20, 2),
     allowNull: false,
   },
+  // merma: {
+  //   type: DataTypes.DECIMAL(20, 2),
+  //   allowNull: true,
+  // },
+  // descripcion: {
+  //   type: DataTypes.DECIMAL(20, 2),
+  //   allowNull: true,
+  // },
   produccion: {
     type: DataTypes.ENUM('SANTA ELENA', 'PRODUCCION PROPIA'),
     allowNull: false,
