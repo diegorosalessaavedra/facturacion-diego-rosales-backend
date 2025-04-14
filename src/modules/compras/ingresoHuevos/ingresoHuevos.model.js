@@ -8,10 +8,7 @@ const IngresoHuevos = db.define('ingresoHuevos', {
     allowNull: false,
     type: DataTypes.INTEGER,
   },
-  autorizado: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
+
   comprador: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -19,7 +16,6 @@ const IngresoHuevos = db.define('ingresoHuevos', {
   codigo_compra: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
   },
   observacion: {
     type: DataTypes.TEXT,

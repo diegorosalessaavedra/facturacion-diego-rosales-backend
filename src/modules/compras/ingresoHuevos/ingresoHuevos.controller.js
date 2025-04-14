@@ -35,7 +35,7 @@ export const create = catchAsync(async (req, res, next) => {
     produccion,
     productos,
     arrayPagos,
-    autorizado,
+
     comprador,
     observacion,
   } = req.body;
@@ -56,7 +56,7 @@ export const create = catchAsync(async (req, res, next) => {
       {
         fecha_pedido,
         produccion,
-        autorizado,
+
         comprador,
         codigo_compra: codigoCompra,
         observacion,
@@ -123,7 +123,7 @@ export const update = catchAsync(async (req, res, next) => {
     produccion,
     productos,
     arrayPagos,
-    autorizado,
+
     comprador,
     observacion,
   } = req.body;
@@ -149,7 +149,7 @@ export const update = catchAsync(async (req, res, next) => {
         codigo_compra: codigoCompra, // Usar solo el codigoCompra generado
         fecha_pedido,
         produccion,
-        autorizado,
+
         comprador,
         observacion,
         total_precio: totalPrecioProductos,

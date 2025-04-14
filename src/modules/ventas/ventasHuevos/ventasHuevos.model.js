@@ -17,10 +17,6 @@ const VentasHuevos = db.define('ventasHuevos', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  fecha_vencimiento: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
   cliente: {
     type: DataTypes.STRING,
     allowNull: false,

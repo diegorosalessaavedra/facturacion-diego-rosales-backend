@@ -10,7 +10,7 @@ export const findAll = catchAsync(async (req, res, next) => {
   let whereIngreso = {};
 
   if (stock !== 'false') {
-    whereFilters.stock = { [Op.gt]: 1 };
+    whereFilters.stock = { [Op.gt]: 0 };
   }
 
   if (produccion && produccion !== 'TODOS') {

@@ -9,12 +9,12 @@ import { ProductosVentaHuevos } from '../productosVentaHuevos/productosVentaHuev
 import { VentasHuevos } from './ventasHuevos.model.js';
 
 export const findAll = catchAsync(async (req, res, next) => {
-  const { fecha_solicitud, fecha_vencimiento, cliente, estado } = req.query;
+  const { fecha_solicitud, fecha_final, cliente, estado } = req.query;
 
   let whereFilters = {};
   if (fecha_solicitud) {
     whereFilters.fecha_solicitud = {
-      [Op.between]: [fecha_solicitud, fecha_vencimiento],
+      [Op.between]: [fecha_solicitud, fecha_final],
     };
   }
 
@@ -53,7 +53,7 @@ export const create = catchAsync(async (req, res, next) => {
   const {
     vendedor,
     fecha_solicitud,
-    fecha_vencimiento,
+
     cliente,
     observacion,
     productos,
@@ -111,7 +111,7 @@ export const create = catchAsync(async (req, res, next) => {
       {
         vendedor,
         fecha_solicitud,
-        fecha_vencimiento,
+
         cliente,
         observacion,
         total: totalPrecioProductos,
@@ -185,7 +185,7 @@ export const update = catchAsync(async (req, res, next) => {
   const {
     vendedor,
     fecha_solicitud,
-    fecha_vencimiento,
+
     cliente,
     observacion,
     productos,
@@ -208,7 +208,7 @@ export const update = catchAsync(async (req, res, next) => {
       {
         vendedor,
         fecha_solicitud,
-        fecha_vencimiento,
+
         cliente,
         observacion,
         total: totalPrecioProductos,
