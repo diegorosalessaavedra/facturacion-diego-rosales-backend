@@ -271,7 +271,7 @@ export const deleteElement = catchAsync(async (req, res) => {
   );
 
   // Actualizar el estado de la venta
-  await ventaHuevo.update({ status: 'ANULADO' });
+  await ventaHuevo.update({ estado: 'ANULADO' });
 
   return res.status(200).json({
     status: 'success',
