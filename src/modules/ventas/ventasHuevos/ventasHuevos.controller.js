@@ -191,7 +191,6 @@ export const update = catchAsync(async (req, res, next) => {
     arrayPagos = [],
   } = req.body;
 
-  // Cálculos optimizados usando métodos más eficientes
   const totalPrecioProductos = productos.reduce(
     (sum, producto) => sum + Number(producto.total),
     0
