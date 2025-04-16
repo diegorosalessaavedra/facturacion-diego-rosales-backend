@@ -117,7 +117,7 @@ export const create = catchAsync(async (req, res, next) => {
         saldo: totalPrecioProductos - pagado,
         estado_pago:
           Math.abs(totalPrecioProductos - pagado) < 0.01
-            ? 'CANCELADO'
+            ? 'PAGADO'
             : 'PENDIENTE',
       },
       { transaction }
@@ -214,7 +214,7 @@ export const update = catchAsync(async (req, res, next) => {
         saldo: totalPrecioProductos - pagado,
         estado_pago:
           Math.abs(totalPrecioProductos - pagado) < 0.01
-            ? 'CANCELADO'
+            ? 'PAGADO'
             : 'PENDIENTE',
       },
       { transaction }
