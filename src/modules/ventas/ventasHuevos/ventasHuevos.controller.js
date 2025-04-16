@@ -1,4 +1,4 @@
-import { Op } from 'sequelize';
+import { Op, where } from 'sequelize';
 import { db } from '../../../db/db.config.js';
 import { AppError } from '../../../utils/AppError.js';
 import { catchAsync } from '../../../utils/catchAsync.js';
@@ -53,7 +53,6 @@ export const create = catchAsync(async (req, res, next) => {
   const {
     vendedor,
     fecha_solicitud,
-
     cliente,
     observacion,
     productos,
@@ -116,7 +115,7 @@ export const create = catchAsync(async (req, res, next) => {
         observacion,
         total: totalPrecioProductos,
         saldo: totalPrecioProductos - pagado,
-        estadoPago:
+        estado_pago:
           Math.abs(totalPrecioProductos - pagado) < 0.01
             ? 'CANCELADO'
             : 'PENDIENTE',
@@ -213,7 +212,7 @@ export const update = catchAsync(async (req, res, next) => {
         observacion,
         total: totalPrecioProductos,
         saldo: totalPrecioProductos - pagado,
-        estadoPago:
+        estado_pago:
           Math.abs(totalPrecioProductos - pagado) < 0.01
             ? 'CANCELADO'
             : 'PENDIENTE',
@@ -262,10 +261,21 @@ export const update = catchAsync(async (req, res, next) => {
 export const deleteElement = catchAsync(async (req, res) => {
   const { ventaHuevo } = req;
 
-  await ventaHuevo.update({ status: 'Anulado' });
+  await Promise.all(
+    ventaHuevo.productos.map((producto) =>
+      Huevos.update(
+        { stock: Number(producto.huevo.stock) + Number(producto.cantidad) },
+        { where: { id: producto.huevo.id } }
+      )
+    )
+  );
+
+  // Actualizar el estado de la venta
+  await ventaHuevo.update({ status: 'ANULADO' });
 
   return res.status(200).json({
     status: 'success',
-    message: `The ventaHuevo with id: ${ventaHuevo.id} has been deleted`,
+    message: `La venta de huevo con id: ${ventaHuevo.id} ha sido anulada correctamente`,
+    data: ventaHuevo,
   });
 });

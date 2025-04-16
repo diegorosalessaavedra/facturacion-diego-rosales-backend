@@ -33,10 +33,15 @@ const VentasHuevos = db.define('ventasHuevos', {
     type: DataTypes.DECIMAL(20, 2),
     allowNull: false,
   },
-  estado: {
+  estado_pago: {
     type: DataTypes.ENUM('PAGADO', 'PENDIENTE'),
     allowNull: false,
     defaultValue: 'PENDIENTE',
+  },
+  estado: {
+    type: DataTypes.ENUM('ACTIVO', 'ANULADO'),
+    allowNull: false,
+    defaultValue: 'ACTIVO',
   },
 });
 
