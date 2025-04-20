@@ -150,6 +150,7 @@ export const create = catchAsync(async (req, res, next) => {
       precio_unitario: producto.precio_sin_igv,
       total: producto.total,
       paquetes: producto.paquetes,
+      planchas: producto.planchas,
     }));
 
     await ProductosVentaHuevos.bulkCreate(productosVentaData, { transaction });
@@ -184,7 +185,6 @@ export const update = catchAsync(async (req, res, next) => {
   const {
     vendedor,
     fecha_solicitud,
-
     cliente,
     observacion,
     productos,

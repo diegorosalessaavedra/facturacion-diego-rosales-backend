@@ -20,6 +20,11 @@ const ProductosVentaHuevos = db.define('productosVentaHuevos', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  planchas: {
+    type: DataTypes.DECIMAL(20, 2),
+    allowNull: false,
+  },
+
   cantidad: {
     type: DataTypes.DECIMAL(20, 2),
 
