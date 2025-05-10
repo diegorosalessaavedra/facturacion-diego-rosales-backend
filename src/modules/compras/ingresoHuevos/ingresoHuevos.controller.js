@@ -28,6 +28,7 @@ export const findAll = catchAsync(async (req, res, next) => {
       { model: CostosProduccion, as: 'costo_produccion', attributes: ['id'] },
       { model: Origen, as: 'origen' },
     ],
+    order: [['fecha_pedido', 'DESC']],
   });
 
   return res.status(200).json({
@@ -66,6 +67,7 @@ export const create = catchAsync(async (req, res, next) => {
   }
 
   const codigoCompra = `${origen.codigo_origen}-${formatoFinal}`;
+  console.log(codigoCompra);
 
   const totalPrecioProductos = productos.reduce(
     (sum, producto) => sum + Number(producto.total),
@@ -151,7 +153,7 @@ export const update = catchAsync(async (req, res, next) => {
   // Formatear el código de compra basado en la fecha y producción
   const partes = fecha_pedido.split('-');
   const formatoFinal = partes[2] + partes[1] + partes[0].slice(2); // "260325"
-  const origen = Origen.findOne({ where: { id: origen_id } });
+  const origen = await Origen.findOne({ where: { id: origen_id } });
 
   if (!origen) {
     return next(new Error('Origen not found.'));
