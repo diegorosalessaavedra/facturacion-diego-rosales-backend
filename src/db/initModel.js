@@ -1,5 +1,6 @@
 import { MetodosPago } from '../modules/ajustes/metodosPagos/metodosPago.model.js';
 import { Clientes } from '../modules/clientesProveedores/clientes/clientes.model.js';
+import { Origen } from '../modules/clientesProveedores/origen/origen.model.js';
 import { Proveedores } from '../modules/clientesProveedores/proveedores/proveedores.model.js';
 import { ComprobantesOrdenCompras } from '../modules/compras/comprobantesOrdenCompras/comprobantesOrdenCompras.model.js';
 import { IngresoHuevos } from '../modules/compras/ingresoHuevos/ingresoHuevos.model.js';
@@ -210,6 +211,16 @@ const initModel = () => {
   MisProductos.hasMany(ProductosNotasComprobante, {
     foreignKey: 'productoId',
     as: 'productosNotas',
+  });
+
+  IngresoHuevos.belongsTo(Origen, {
+    foreignKey: 'origen_id',
+    as: 'origen',
+  });
+
+  Origen.hasOne(IngresoHuevos, {
+    foreignKey: 'origen_id',
+    as: 'ingreso_huevos',
   });
 
   Huevos.belongsTo(IngresoHuevos, {

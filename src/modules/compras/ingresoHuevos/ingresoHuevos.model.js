@@ -8,7 +8,10 @@ const IngresoHuevos = db.define('ingresoHuevos', {
     allowNull: false,
     type: DataTypes.INTEGER,
   },
-
+  origen_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   comprador: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -28,19 +31,6 @@ const IngresoHuevos = db.define('ingresoHuevos', {
   total_precio: {
     type: DataTypes.DECIMAL(20, 2),
     allowNull: false,
-  },
-  // merma: {
-  //   type: DataTypes.DECIMAL(20, 2),
-  //   allowNull: true,
-  // },
-  // descripcion: {
-  //   type: DataTypes.DECIMAL(20, 2),
-  //   allowNull: true,
-  // },
-  produccion: {
-    type: DataTypes.ENUM('SANTA ELENA', 'PRODUCCION PROPIA'),
-    allowNull: false,
-    defaultValue: 'SANTA ELENA',
   },
 });
 

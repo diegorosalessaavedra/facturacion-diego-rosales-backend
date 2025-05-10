@@ -2,6 +2,7 @@ import { Op } from 'sequelize';
 import { catchAsync } from '../../../utils/catchAsync.js';
 import { Huevos } from './huevos.model.js';
 import { IngresoHuevos } from '../../compras/ingresoHuevos/ingresoHuevos.model.js';
+import { Origen } from '../../clientesProveedores/origen/origen.model.js';
 
 export const findAll = catchAsync(async (req, res, next) => {
   const { produccion, stock, fecha_inicial, fecha_final } = req.query;
@@ -28,6 +29,7 @@ export const findAll = catchAsync(async (req, res, next) => {
     include: [
       {
         model: IngresoHuevos,
+        include: [{ model: Origen, as: 'origen' }],
         where: whereIngreso,
         as: 'ingreso_huevos',
       },

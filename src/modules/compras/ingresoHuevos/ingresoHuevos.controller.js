@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import { db } from '../../../db/db.config.js';
 import { catchAsync } from '../../../utils/catchAsync.js';
 import { MetodosPago } from '../../ajustes/metodosPagos/metodosPago.model.js';
@@ -5,11 +6,27 @@ import { CostosProduccion } from '../../costos/costosProduccion/costosProduccion
 import { Huevos } from '../../productos/huevos/huevos.model.js';
 import { PagosIngresoHuevos } from '../pagosIngresoHuevos/pagosIngresoHuevos.model.js';
 import { IngresoHuevos } from './ingresoHuevos.model.js';
+import { Origen } from '../../clientesProveedores/origen/origen.model.js';
 
 export const findAll = catchAsync(async (req, res, next) => {
+  const { fecha_inicio, fecha_final, origen_id } = req.query;
+
+  let whereFilters = {};
+  if (fecha_inicio) {
+    whereFilters.fecha_pedido = {
+      [Op.between]: [fecha_inicio, fecha_final],
+    };
+  }
+
+  if (origen_id !== '0') {
+    whereFilters.origen_id = origen_id;
+  }
+
   const ingresoHuevos = await IngresoHuevos.findAll({
+    where: whereFilters,
     include: [
       { model: CostosProduccion, as: 'costo_produccion', attributes: ['id'] },
+      { model: Origen, as: 'origen' },
     ],
   });
 
@@ -32,19 +49,23 @@ export const findOne = catchAsync(async (req, res, next) => {
 export const create = catchAsync(async (req, res, next) => {
   const {
     fecha_pedido,
-    produccion,
+    origen_id,
     productos,
     arrayPagos,
-
     comprador,
     observacion,
   } = req.body;
 
   const partes = fecha_pedido.split('-');
-  const formatoFinal = partes[2] + partes[1] + partes[0].slice(2); // "260325"
+  const formatoFinal = partes[2] + partes[1] + partes[0].slice(2);
 
-  const codigoCompra =
-    produccion === 'SANTA ELENA' ? `SE-${formatoFinal}` : `PP-${formatoFinal}`;
+  const origen = Origen.findOne({ where: { id: origen_id } });
+
+  if (!origen) {
+    return next(new Error('Origen not found.'));
+  }
+
+  const codigoCompra = `${origen.codigo_origen}-${formatoFinal}`;
 
   const totalPrecioProductos = productos.reduce(
     (sum, producto) => sum + Number(producto.total),
@@ -55,8 +76,7 @@ export const create = catchAsync(async (req, res, next) => {
     const ingresoHuevo = await IngresoHuevos.create(
       {
         fecha_pedido,
-        produccion,
-
+        origen_id,
         comprador,
         codigo_compra: codigoCompra,
         observacion,
@@ -120,7 +140,7 @@ export const update = catchAsync(async (req, res, next) => {
 
   const {
     fecha_pedido,
-    produccion,
+    origen_id,
     productos,
     arrayPagos,
 
@@ -131,8 +151,13 @@ export const update = catchAsync(async (req, res, next) => {
   // Formatear el código de compra basado en la fecha y producción
   const partes = fecha_pedido.split('-');
   const formatoFinal = partes[2] + partes[1] + partes[0].slice(2); // "260325"
-  const codigoCompra =
-    produccion === 'SANTA ELENA' ? `SE-${formatoFinal}` : `PP-${formatoFinal}`;
+  const origen = Origen.findOne({ where: { id: origen_id } });
+
+  if (!origen) {
+    return next(new Error('Origen not found.'));
+  }
+
+  const codigoCompra = `${origen.codigo_origen}-${formatoFinal}`;
 
   // Calcular el total de los productos
   const totalPrecioProductos = productos.reduce(
@@ -148,8 +173,7 @@ export const update = catchAsync(async (req, res, next) => {
       {
         codigo_compra: codigoCompra, // Usar solo el codigoCompra generado
         fecha_pedido,
-        produccion,
-
+        origen_id,
         comprador,
         observacion,
         total_precio: totalPrecioProductos,

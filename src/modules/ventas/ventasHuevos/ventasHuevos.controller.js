@@ -1,4 +1,4 @@
-import { Op, where } from 'sequelize';
+import { Op } from 'sequelize';
 import { db } from '../../../db/db.config.js';
 import { AppError } from '../../../utils/AppError.js';
 import { catchAsync } from '../../../utils/catchAsync.js';
@@ -110,7 +110,6 @@ export const create = catchAsync(async (req, res, next) => {
       {
         vendedor,
         fecha_solicitud,
-
         cliente,
         observacion,
         total: totalPrecioProductos,

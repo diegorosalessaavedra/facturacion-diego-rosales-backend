@@ -32,6 +32,7 @@ import { ingresoHuevosRouter } from './modules/compras/ingresoHuevos/ingresoHuev
 import { ventasHuevosRouter } from './modules/ventas/ventasHuevos/ventasHuevos.routes.js';
 import { cuentasBancariasRouter } from './modules/ajustes/cuentasBancarias/cuentasBancarias.routes.js';
 import { costosProduccionRouter } from './modules/costos/costosProduccion/costosProduccion.routes.js';
+import { origenRouter } from './modules/clientesProveedores/origen/origen.routes.js';
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.use('/api/v1/users', usersRouter);
 
 app.use('/api/v1/clientes', clientesRouter);
 app.use('/api/v1/proveedores', proveedoresRouter);
+app.use('/api/v1/origen', origenRouter);
 
 // ubigeo
 app.use('/api/v1/departamentos', departamentosRouter);
