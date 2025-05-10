@@ -60,14 +60,13 @@ export const create = catchAsync(async (req, res, next) => {
   const partes = fecha_pedido.split('-');
   const formatoFinal = partes[2] + partes[1] + partes[0].slice(2);
 
-  const origen = Origen.findOne({ where: { id: origen_id } });
+  const origen = await Origen.findOne({ where: { id: origen_id } });
 
   if (!origen) {
     return next(new Error('Origen not found.'));
   }
 
   const codigoCompra = `${origen.codigo_origen}-${formatoFinal}`;
-  console.log(codigoCompra);
 
   const totalPrecioProductos = productos.reduce(
     (sum, producto) => sum + Number(producto.total),
