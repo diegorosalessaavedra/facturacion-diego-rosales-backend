@@ -33,6 +33,8 @@ import { ventasHuevosRouter } from './modules/ventas/ventasHuevos/ventasHuevos.r
 import { cuentasBancariasRouter } from './modules/ajustes/cuentasBancarias/cuentasBancarias.routes.js';
 import { costosProduccionRouter } from './modules/costos/costosProduccion/costosProduccion.routes.js';
 import { origenRouter } from './modules/clientesProveedores/origen/origen.routes.js';
+import { colaboradoresRouter } from './modules/rrhh/modColaboradores/colaboradores/colaboradores.routes.js';
+import { cargoLaboralRouter } from './modules/rrhh/modColaboradores/cargoLaboral/cargoLaboral.routes.js';
 
 const app = express();
 
@@ -111,8 +113,13 @@ app.use('/api/v1/comprobantes/notas-comprobantes', notasComprobantesRouter);
 
 //costos
 app.use('/api/v1/costos/costos-produccion', costosProduccionRouter);
-
 //costos
+
+// RRHH
+//colaboradores
+app.use('/api/v1/rrhh/colaboradores', colaboradoresRouter);
+app.use('/api/v1/rrhh/cargo-laboral', cargoLaboralRouter);
+
 app.all('*', (req, res, next) => {
   return next(
     new AppError(`Can't find ${req.originalUrl} on this server! 💀`, 404)

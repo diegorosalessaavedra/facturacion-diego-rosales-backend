@@ -144,9 +144,9 @@ export const update = catchAsync(async (req, res, next) => {
     origen_id,
     productos,
     arrayPagos,
-
     comprador,
     observacion,
+    productosEliminados,
   } = req.body;
 
   // Formatear el código de compra basado en la fecha y producción
@@ -264,6 +264,18 @@ export const update = catchAsync(async (req, res, next) => {
     });
 
     await Promise.all(productosPromises);
+
+    for (const productoEliminado of productosEliminados) {
+      const existHuevo = await Huevos.findOne({
+        where: {
+          id: productoEliminado,
+        },
+      });
+
+      if (existHuevo) {
+        await existHuevo.destroy({ transaction });
+      }
+    }
 
     await transaction.commit();
 
