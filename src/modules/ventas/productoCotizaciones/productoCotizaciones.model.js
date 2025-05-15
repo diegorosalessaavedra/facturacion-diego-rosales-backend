@@ -17,7 +17,7 @@ const ProductoCotizaciones = db.define('productoCotizaciones', {
     allowNull: false,
   },
   cantidad: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.DECIMAL(20, 2),
     allowNull: false,
   },
   precioUnitario: {

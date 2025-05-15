@@ -5,7 +5,7 @@ import FormData from 'form-data';
 import { AppError } from '../../../../utils/AppError.js';
 import { db } from '../../../../db/db.config.js';
 
-export const findAll = catchAsync(async (res) => {
+export const findAll = catchAsync(async (req, res, next) => {
   const colaboradores = await Colaboradores.findAll();
 
   return res.status(200).json({
@@ -94,7 +94,7 @@ export const create = catchAsync(async (req, res, next) => {
         filename: cvFile.originalname,
       });
 
-      const uploadUrl = `${process.env.LARAVEL_URL}/api/upload/file`;
+      const uploadUrl = `${process.env.LARAVEL_URL}/api/colaboradores`;
 
       const response = await axios.post(uploadUrl, cvFormData, {
         headers: {
@@ -125,6 +125,8 @@ export const create = catchAsync(async (req, res, next) => {
       colaborador,
     });
   } catch (error) {
+    console.log(error);
+
     await transaction.rollback();
     return next(
       new AppError(
