@@ -1,7 +1,7 @@
 import { DataTypes } from 'sequelize';
-import { db } from '../../../db/db.config';
+import { db } from '../../../../db/db.config.js';
 
-const DocCompleCola = db.define('doc_comple_cola', {
+const DocCompleColaboradores = db.define('doc_comple_colaboradores', {
   id: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -12,7 +12,7 @@ const DocCompleCola = db.define('doc_comple_cola', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-  nombre: {
+  nombre_doc_complementario: {
     type: DataTypes.STRING,
     allowNull: false,
   },
@@ -22,4 +22,4 @@ const DocCompleCola = db.define('doc_comple_cola', {
   },
 });
 
-export { DocCompleCola };
+export { DocCompleColaboradores };

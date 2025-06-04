@@ -13,7 +13,11 @@ router.use(authMiddleware.protect);
 router.get('/', colaboradoresController.findAll);
 router.post(
   '/',
-  upload.single('cv_colaborador'),
+  upload.fields([
+    { name: 'foto_colaborador', maxCount: 1 },
+    { name: 'cv_colaborador', maxCount: 1 },
+    { name: 'archivos_complementarios', maxCount: 10 }, // Ajusta maxCount según necesites
+  ]),
   colaboradoresController.create
 );
 

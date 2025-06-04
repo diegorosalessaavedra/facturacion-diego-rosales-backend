@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import { db } from '../../../../db/db.config';
+import { db } from '../../../../db/db.config.js';
 
 const DescanzoMedico = db.define('descanzo_medico', {
   id: {
@@ -7,6 +7,14 @@ const DescanzoMedico = db.define('descanzo_medico', {
     allowNull: false,
     autoIncrement: true,
     primaryKey: true,
+  },
+  colaborador_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  titulo_descanzo_medico: {
+    type: DataTypes.STRING,
+    allowNull: false,
   },
   periodo_inicio: {
     type: DataTypes.STRING,

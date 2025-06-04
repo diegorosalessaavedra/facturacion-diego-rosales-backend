@@ -8,6 +8,10 @@ const Colaboradores = db.define('colaboradores', {
     autoIncrement: true,
     primaryKey: true,
   },
+  foto_colaborador: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
   nombre_colaborador: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -75,7 +79,7 @@ const Colaboradores = db.define('colaboradores', {
   //   allowNull: false,
   // },
   cargo_laboral_id: {
-    type: DataTypes.STRING,
+    type: DataTypes.INTEGER,
     allowNull: true,
   },
   tipo_empleo_colaborador: {

@@ -20,6 +20,12 @@ import { CostosProduccion } from '../modules/costos/costosProduccion/costosProdu
 import { Huevos } from '../modules/productos/huevos/huevos.model.js';
 import { MisProductos } from '../modules/productos/misProductos/misProductos.model.js';
 import { SaldoInicialKardex } from '../modules/productos/saldoInicialKardex/saldoInicialKardex.model.js';
+import { CargoLaboral } from '../modules/rrhh/modColaboradores/cargoLaboral/cargoLaboral.model.js';
+import { Colaboradores } from '../modules/rrhh/modColaboradores/colaboradores/colaboradores.model.js';
+import { DocCompleColaboradores } from '../modules/rrhh/modColaboradores/docCompleColaboradores/docCompleColaboradores.model.js';
+import { DescanzoMedico } from '../modules/rrhh/modDescanzoMedico/descanzoMedico/descanzoMedico.model.js';
+import { Vacaciones } from '../modules/rrhh/modVacaciones/vacaciones/vacaciones.model.js';
+import { VacionesSolicitadas } from '../modules/rrhh/modVacaciones/vacionesSolicitadas/vacionesSolicitadas.model.js';
 import { Departamentos } from '../modules/ubigeos/departamentos/departamentos.model.js';
 import { Distritos } from '../modules/ubigeos/distritos/distritos.model.js';
 import { Provincias } from '../modules/ubigeos/provincias/provincias.model.js';
@@ -326,6 +332,58 @@ const initModel = () => {
   Proveedores.belongsTo(Provincias, {
     foreignKey: 'provinciaId',
   });
+
+  // rrhh
+  CargoLaboral.hasMany(Colaboradores, {
+    foreignKey: 'cargo_laboral_id',
+    as: 'colaboradores',
+  });
+
+  Colaboradores.belongsTo(CargoLaboral, {
+    foreignKey: 'cargo_laboral_id',
+    as: 'cargo_laboral',
+  });
+
+  Colaboradores.hasMany(DocCompleColaboradores, {
+    foreignKey: 'colaborador_id',
+    as: 'documentos_complementarios',
+  });
+
+  DocCompleColaboradores.belongsTo(Colaboradores, {
+    foreignKey: 'colaborador_id',
+    as: 'colaborador',
+  });
+
+  Colaboradores.hasMany(DescanzoMedico, {
+    foreignKey: 'colaborador_id',
+    as: 'descanzos_medicos',
+  });
+
+  DescanzoMedico.belongsTo(Colaboradores, {
+    foreignKey: 'colaborador_id',
+    as: 'colaborador',
+  });
+
+  Colaboradores.hasMany(Vacaciones, {
+    foreignKey: 'colaborador_id',
+    as: 'vacaciones',
+  });
+
+  Vacaciones.belongsTo(Colaboradores, {
+    foreignKey: 'colaborador_id',
+    as: 'colaborador',
+  });
+
+  Colaboradores.hasMany(VacionesSolicitadas, {
+    foreignKey: 'colaborador_id',
+    as: 'vacaciones_solicitadas',
+  });
+
+  VacionesSolicitadas.belongsTo(Colaboradores, {
+    foreignKey: 'colaborador_id',
+    as: 'colaborador',
+  });
+  // rrhh
 };
 
 export { initModel };

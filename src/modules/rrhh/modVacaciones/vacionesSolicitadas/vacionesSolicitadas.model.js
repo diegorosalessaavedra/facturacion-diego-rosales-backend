@@ -1,7 +1,7 @@
 import { DataTypes } from 'sequelize';
-import { db } from '../../../../db/db.config';
+import { db } from '../../../../db/db.config.js';
 
-const SolicitarVacaciones = db.define('solicitar_vacaciones', {
+const VacionesSolicitadas = db.define('vacaciones_solicitadas', {
   id: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -28,11 +28,20 @@ const SolicitarVacaciones = db.define('solicitar_vacaciones', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  pendiente_autorización: {
+  motivo_vacaciones: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  autorizacion_modificado: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+  pendiente_autorizacion: {
     type: DataTypes.ENUM('PENDIENTE', 'ACEPTADO', 'RECHAZADO'),
     allowNull: false,
     defaultValue: 'PENDIENTE',
   },
 });
 
-export { SolicitarVacaciones };
+export { VacionesSolicitadas };

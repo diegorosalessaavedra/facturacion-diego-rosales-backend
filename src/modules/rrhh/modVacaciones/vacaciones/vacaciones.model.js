@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import { db } from '../../../../db/db.config';
+import { db } from '../../../../db/db.config.js';
 
 const Vacaciones = db.define('vacaciones', {
   id: {
@@ -17,8 +17,9 @@ const Vacaciones = db.define('vacaciones', {
     allowNull: false,
   },
   dias_disponibles: {
-    type: DataTypes.STRING,
+    type: DataTypes.INTEGER,
     allowNull: false,
+    defaultValue: 15,
   },
 });
 
