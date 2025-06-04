@@ -8,6 +8,7 @@ import { Cotizaciones } from './cotizaciones.model.js';
 import { Clientes } from '../../clientesProveedores/clientes/clientes.model.js';
 import { Op } from 'sequelize';
 import { ComprobantesElectronicos } from '../../comprobantes/filesComprobanteElectronicos/comprobantesElectronicos/comprobantesElectronicos.model.js';
+import { NotasComprobante } from '../../comprobantes/filesNotasComprobante/notasComprobante/notasComprobante.model.js';
 
 export const findAllTotal = catchAsync(async (req, res, next) => {
   const fechaInicio = new Date(new Date().getFullYear(), 0, 1); // 1 de enero del año actual
@@ -103,6 +104,11 @@ export const findAll = catchAsync(async (req, res, next) => {
       {
         model: ComprobantesElectronicos,
         as: 'ComprobanteElectronico',
+        include: [
+          {
+            model: NotasComprobante,
+          },
+        ],
       },
     ],
     order: [
