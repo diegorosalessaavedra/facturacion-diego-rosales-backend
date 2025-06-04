@@ -90,10 +90,10 @@ export const getComprobanteConfig = async (tipoComprobante) => {
       },
     });
   } else if (tipoComprobante === 'NOTA DE VENTA') {
-    existingComprobantes = ComprobantesElectronicos.findAll({
+    existingComprobantes = await ComprobantesElectronicos.findAll({
       where: {
         tipoComprobante: 'NOTA DE VENTA',
-        serie: process.env.SERIE_BOLETA,
+        serie: process.env.SERIE_NOTA,
       },
     });
   }

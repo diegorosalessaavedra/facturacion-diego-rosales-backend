@@ -723,6 +723,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
     }
 
     let facturaAceptada = false;
+    console.log(formatWithLeadingZeros(comprobanteConfig.numeroSerie, 8));
 
     if (comprobanteConfig.url) {
       const dataComprobante = {
