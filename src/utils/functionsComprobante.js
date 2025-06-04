@@ -4,7 +4,7 @@ import { AppError } from './AppError.js';
 const COMPROBANTE_TYPES = {
   NOTA_VENTA: {
     name: 'NOTA DE VENTA',
-    serie: 'NO00',
+    serie: process.env.SERIE_NOTA,
   },
   FACTURA: {
     tipoDoc: '01',
