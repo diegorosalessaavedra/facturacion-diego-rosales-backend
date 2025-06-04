@@ -531,6 +531,34 @@ export const create = catchAsync(async (req, res, next) => {
           { transaction }
         );
       }
+    } else {
+      for (const productoStock of productosConStock) {
+        const miProducto = await MisProductos.findOne({
+          where: { id: productoStock.productoId },
+          attributes: ['id', 'stock', 'nombre', 'codUnidad', 'conStock'],
+          lock: true,
+          transaction,
+        });
+
+        if (miProducto.conStock) {
+          await miProducto.update(
+            {
+              stock: Number(miProducto.stock) - Number(productoStock.cantidad),
+            },
+            {
+              transaction,
+              validate: true,
+            }
+          );
+        }
+      }
+
+      await comprobanteElectronico.update(
+        {
+          estado: 'ACEPTADA',
+        },
+        { transaction }
+      );
     }
 
     await transaction.commit();
