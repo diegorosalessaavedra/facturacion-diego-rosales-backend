@@ -1,12 +1,8 @@
-import { MetodosPago } from '../modules/ajustes/metodosPagos/metodosPago.model.js';
 import { Clientes } from '../modules/clientesProveedores/clientes/clientes.model.js';
-import { Origen } from '../modules/clientesProveedores/origen/origen.model.js';
 import { Proveedores } from '../modules/clientesProveedores/proveedores/proveedores.model.js';
 import { ComprobantesOrdenCompras } from '../modules/compras/comprobantesOrdenCompras/comprobantesOrdenCompras.model.js';
-import { IngresoHuevos } from '../modules/compras/ingresoHuevos/ingresoHuevos.model.js';
 import { OrdenesCompra } from '../modules/compras/ordenesCompra/ordenesCompra.model.js';
 import { PagosComprobanteOrdenCompras } from '../modules/compras/pagosComprobanteOrdenCompras/pagosComprobanteOrdenCompras.model.js';
-import { PagosIngresoHuevos } from '../modules/compras/pagosIngresoHuevos/pagosIngresoHuevos.model.js';
 import { PagosOrdenCompras } from '../modules/compras/pagosOrdenCompras/pagosOrdenCompras.model.js';
 import { ProductosComprobanteOrdenCompras } from '../modules/compras/productosComprobanteOrdenCompras/productosComprobanteOrdenCompras.model.js';
 import { ProductosOrdenCompras } from '../modules/compras/productosOrdenCompras/productosOrdenCompras.model.js';
@@ -16,26 +12,21 @@ import { PagosComprobantesElectronicos } from '../modules/comprobantes/filesComp
 import { ProductosComprobanteElectronico } from '../modules/comprobantes/filesComprobanteElectronicos/productosComprobanteElectronico/productosComprobanteElectronico.model.js';
 import { NotasComprobante } from '../modules/comprobantes/filesNotasComprobante/notasComprobante/notasComprobante.model.js';
 import { ProductosNotasComprobante } from '../modules/comprobantes/filesNotasComprobante/productosNotasComprobante/productosNotasComprobante.model.js';
-import { CostosProduccion } from '../modules/costos/costosProduccion/costosProduccion.model.js';
-import { Huevos } from '../modules/productos/huevos/huevos.model.js';
 import { MisProductos } from '../modules/productos/misProductos/misProductos.model.js';
 import { SaldoInicialKardex } from '../modules/productos/saldoInicialKardex/saldoInicialKardex.model.js';
-import { CargoLaboral } from '../modules/rrhh/modColaboradores/cargoLaboral/cargoLaboral.model.js';
-import { Colaboradores } from '../modules/rrhh/modColaboradores/colaboradores/colaboradores.model.js';
-import { DocCompleColaboradores } from '../modules/rrhh/modColaboradores/docCompleColaboradores/docCompleColaboradores.model.js';
-import { DescanzoMedico } from '../modules/rrhh/modDescanzoMedico/descanzoMedico/descanzoMedico.model.js';
-import { Vacaciones } from '../modules/rrhh/modVacaciones/vacaciones/vacaciones.model.js';
-import { VacionesSolicitadas } from '../modules/rrhh/modVacaciones/vacionesSolicitadas/vacionesSolicitadas.model.js';
 import { Departamentos } from '../modules/ubigeos/departamentos/departamentos.model.js';
 import { Distritos } from '../modules/ubigeos/distritos/distritos.model.js';
 import { Provincias } from '../modules/ubigeos/provincias/provincias.model.js';
 import { User } from '../modules/user/user.model.js';
 import { Cotizaciones } from '../modules/ventas/cotizaciones/cotizaciones.model.js';
 import { PagosCotizaciones } from '../modules/ventas/pagosCotizaciones/pagosCotizaciones.model.js';
-import { PagosVentaHuevos } from '../modules/ventas/pagosVentaHuevos/pagosVentaHuevos.model.js';
 import { ProductoCotizaciones } from '../modules/ventas/productoCotizaciones/productoCotizaciones.model.js';
-import { ProductosVentaHuevos } from '../modules/ventas/productosVentaHuevos/productosVentaHuevos.model.js';
-import { VentasHuevos } from '../modules/ventas/ventasHuevos/ventasHuevos.model.js';
+import { CargoLaboral } from '../modules/rrhh/modColaboradores/cargoLaboral/cargoLaboral.model.js';
+import { Colaboradores } from '../modules/rrhh/modColaboradores/colaboradores/colaboradores.model.js';
+import { DocCompleColaboradores } from '../modules/rrhh/modColaboradores/docCompleColaboradores/docCompleColaboradores.model.js';
+import { DescanzoMedico } from '../modules/rrhh/modDescanzoMedico/descanzoMedico/descanzoMedico.model.js';
+import { Vacaciones } from '../modules/rrhh/modVacaciones/vacaciones/vacaciones.model.js';
+import { VacionesSolicitadas } from '../modules/rrhh/modVacaciones/vacionesSolicitadas/vacionesSolicitadas.model.js';
 
 const initModel = () => {
   Cotizaciones.belongsTo(User, { foreignKey: 'usuarioId', as: 'usario' });
@@ -187,6 +178,11 @@ const initModel = () => {
     as: 'productosComprobante',
   });
 
+  MisProductos.hasMany(ProductoCotizaciones, {
+    foreignKey: 'productoId',
+    as: 'productosCotizaciones',
+  });
+
   MisProductos.hasMany(SaldoInicialKardex, {
     foreignKey: 'miProductoId',
   });
@@ -217,92 +213,6 @@ const initModel = () => {
   MisProductos.hasMany(ProductosNotasComprobante, {
     foreignKey: 'productoId',
     as: 'productosNotas',
-  });
-
-  IngresoHuevos.belongsTo(Origen, {
-    foreignKey: 'origen_id',
-    as: 'origen',
-  });
-
-  Origen.hasOne(IngresoHuevos, {
-    foreignKey: 'origen_id',
-    as: 'ingreso_huevos',
-  });
-
-  Huevos.belongsTo(IngresoHuevos, {
-    foreignKey: 'ingreso_huevos_id',
-    as: 'ingreso_huevos',
-  });
-
-  IngresoHuevos.hasMany(Huevos, {
-    foreignKey: 'ingreso_huevos_id',
-    as: 'huevos',
-  });
-
-  PagosIngresoHuevos.belongsTo(IngresoHuevos, {
-    foreignKey: 'ingreso_huevo_id',
-    as: 'ingreso_huevo',
-  });
-
-  IngresoHuevos.hasOne(CostosProduccion, {
-    foreignKey: 'ingreso_huevo_id',
-    as: 'costo_produccion',
-  });
-
-  CostosProduccion.belongsTo(IngresoHuevos, {
-    foreignKey: 'ingreso_huevo_id',
-    as: 'ingreso_huevos',
-  });
-
-  IngresoHuevos.hasMany(PagosIngresoHuevos, {
-    foreignKey: 'ingreso_huevo_id',
-    as: 'pagos',
-  });
-
-  PagosIngresoHuevos.belongsTo(MetodosPago, {
-    foreignKey: 'metodoPago_id',
-  });
-
-  MetodosPago.hasMany(PagosIngresoHuevos, {
-    foreignKey: 'metodoPago_id',
-  });
-
-  PagosVentaHuevos.belongsTo(VentasHuevos, {
-    foreignKey: 'venta_huevos_id',
-    as: 'venta_huevos',
-  });
-
-  VentasHuevos.hasMany(PagosVentaHuevos, {
-    foreignKey: 'venta_huevos_id',
-    as: 'pagos',
-  });
-
-  PagosVentaHuevos.belongsTo(MetodosPago, {
-    foreignKey: 'metodo_pago_id',
-  });
-
-  MetodosPago.hasMany(PagosVentaHuevos, {
-    foreignKey: 'metodo_pago_id',
-  });
-
-  ProductosVentaHuevos.belongsTo(VentasHuevos, {
-    foreignKey: 'venta_huevos_id',
-    as: 'venta_huevos',
-  });
-
-  VentasHuevos.hasMany(ProductosVentaHuevos, {
-    foreignKey: 'venta_huevos_id',
-    as: 'productos',
-  });
-
-  Huevos.hasMany(ProductosVentaHuevos, {
-    foreignKey: 'huevo_id',
-    as: 'productos_ventas_huevos',
-  });
-
-  ProductosVentaHuevos.belongsTo(Huevos, {
-    foreignKey: 'huevo_id',
-    as: 'huevo',
   });
 
   Clientes.hasMany(Cotizaciones, {

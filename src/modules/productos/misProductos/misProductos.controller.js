@@ -1,19 +1,17 @@
-import { Op, Sequelize } from 'sequelize';
+import { Op } from 'sequelize';
 import { catchAsync } from '../../../utils/catchAsync.js';
 import { ComprobantesOrdenCompras } from '../../compras/comprobantesOrdenCompras/comprobantesOrdenCompras.model.js';
-import { ProductosComprobanteOrdenCompras } from '../../compras/productosComprobanteOrdenCompras/productosComprobanteOrdenCompras.model.js';
 import { ComprobantesElectronicos } from '../../comprobantes/filesComprobanteElectronicos/comprobantesElectronicos/comprobantesElectronicos.model.js';
-import { ProductosComprobanteElectronico } from '../../comprobantes/filesComprobanteElectronicos/productosComprobanteElectronico/productosComprobanteElectronico.model.js';
 import { NotasComprobante } from '../../comprobantes/filesNotasComprobante/notasComprobante/notasComprobante.model.js';
 import { MisProductos } from './misProductos.model.js';
 import { Proveedores } from '../../clientesProveedores/proveedores/proveedores.model.js';
 import { ProductosNotasComprobante } from '../../comprobantes/filesNotasComprobante/productosNotasComprobante/productosNotasComprobante.model.js';
-import { SaldoInicialKardex } from '../saldoInicialKardex/saldoInicialKardex.model.js';
-import {
-  calculatePreviousMonth,
-  formatToUTC,
-  misProductosKardex,
-} from './functionsMisProductos.js';
+
+import { ProductoCotizaciones } from '../../ventas/productoCotizaciones/productoCotizaciones.model.js';
+import { Cotizaciones } from '../../ventas/cotizaciones/cotizaciones.model.js';
+import { ProductosOrdenCompras } from '../../compras/productosOrdenCompras/productosOrdenCompras.model.js';
+import { OrdenesCompra } from '../../compras/ordenesCompra/ordenesCompra.model.js';
+import { Clientes } from '../../clientesProveedores/clientes/clientes.model.js';
 
 export const findAll = catchAsync(async (req, res, next) => {
   const misProductos = await MisProductos.findAll({});
@@ -26,118 +24,178 @@ export const findAll = catchAsync(async (req, res, next) => {
 });
 
 export const findAllKardex = catchAsync(async (req, res, next) => {
-  const { mes, year } = req.query;
+  const { startDate, endDate } = req.query;
 
-  let dateCondition = {};
-  let dateNota = {};
+  try {
+    // 1. Obtener todos los productos
+    const allProducts = await MisProductos.findAll({
+      attributes: [
+        'id',
+        'nombre',
+        'categoria',
+        'codigoSunat',
+        'codigoInterno',
+        'createdAt',
+        'codUnidad',
+      ],
+      raw: false,
+    });
 
-  let startDate;
-  let endDate;
-  const fechaActual = new Date();
+    if (allProducts.length === 0) {
+      return res.status(200).json({
+        status: 'Success',
+        results: 0,
+        misProductos: [],
+      });
+    }
 
-  if (mes && year) {
-    startDate = new Date(`${year}-${mes}-01`);
-    endDate = new Date(year, mes, 0);
+    const productIds = allProducts.map((p) => p.id);
 
-    dateCondition = {
-      fechaEmision: {
-        [Op.between]: [startDate, endDate],
+    // 2. Cotizaciones
+    const cotizaciones = await ProductoCotizaciones.findAll({
+      where: {
+        productoId: { [Op.in]: productIds },
       },
-    };
-    dateNota = {
-      fecha_emision: {
-        [Op.between]: [startDate, endDate],
-      },
-    };
-  }
-
-  const previousMonth = calculatePreviousMonth(endDate);
-  const previousMonthUtc = formatToUTC(previousMonth);
-
-  const misProductos = await MisProductos.findAll({
-    attributes: ['id', 'nombre', 'categoria', 'codigoSunat', 'codigoInterno'],
-
-    include: [
-      {
-        model: SaldoInicialKardex,
-        required: false,
-        where: {
-          fecha: previousMonthUtc,
+      include: [
+        {
+          model: Cotizaciones,
+          as: 'cotizacion',
+          attributes: ['id', 'tipoCotizacion', 'fechaEmision', 'status'],
+          where: {
+            status: 'Activo',
+            ...(startDate && endDate
+              ? { fechaEmision: { [Op.between]: [startDate, endDate] } }
+              : {}),
+          },
+          include: [
+            {
+              model: ComprobantesElectronicos,
+              as: 'ComprobanteElectronico',
+              attributes: [
+                'serie',
+                'numeroSerie',
+                'fechaEmision',
+                'tipoComprobante',
+              ],
+              where: { estado: 'ACEPTADA' },
+              required: false,
+            },
+            {
+              model: Clientes,
+              as: 'cliente',
+              required: false,
+            },
+          ],
         },
-      },
-      {
-        model: ProductosComprobanteElectronico,
-        as: 'productosComprobante',
-        include: [
-          {
-            model: ComprobantesElectronicos,
-            attributes: [
-              'id',
-              'serie',
-              'numeroSerie',
-              'fechaEmision',
-              'tipoComprobante',
-            ],
+      ],
+    });
 
-            required: true,
-            where: {
-              estado: 'ACEPTADA',
-              ...dateCondition,
-            },
+    // 3. Ordenes de compra
+    const ordenesCompra = await ProductosOrdenCompras.findAll({
+      where: { productoId: { [Op.in]: productIds } },
+      include: [
+        {
+          model: OrdenesCompra,
+          attributes: ['id', 'fechaEmision', 'status'],
+          where: {
+            ...(startDate && endDate
+              ? { fechaEmision: { [Op.between]: [startDate, endDate] } }
+              : {}),
           },
-        ],
-      },
-      {
-        model: ProductosComprobanteOrdenCompras,
-        as: 'productosComprobanteOrden',
-        include: [
-          {
-            model: ComprobantesOrdenCompras,
-            attributes: ['id', 'serie', 'fechaEmision', 'tipoComprobante'],
-
-            required: true,
-            where: {
-              status: 'Activo',
-              ...dateCondition,
+          include: [
+            {
+              model: ComprobantesOrdenCompras,
+              as: 'comprobante',
+              attributes: [
+                'serie',
+                'fechaEmision',
+                'tipoComprobante',
+                'status',
+              ],
+              required: true,
+              where: { status: 'Activo' },
             },
-            include: [{ model: Proveedores, as: 'proveedor' }],
-          },
-        ],
-      },
-      {
-        model: ProductosNotasComprobante,
-        as: 'productosNotas',
-        include: [
-          {
-            model: NotasComprobante,
-            attributes: [
-              'id',
-              'serie',
-              'numero_serie',
-              'fecha_emision',
-              'tipo_nota',
-            ],
-
-            required: true,
-            where: {
-              estado: 'ACEPTADA',
-              ...dateNota,
+            {
+              model: Proveedores,
+              as: 'proveedor',
+              required: false,
             },
-          },
-        ],
-      },
-    ],
-  });
+          ],
+        },
+      ],
+    });
 
-  if (fechaActual.getTime() > endDate.getTime()) {
-    misProductosKardex(misProductos, formatToUTC(endDate));
+    // 4. Notas de comprobante
+    const notas = await ProductosNotasComprobante.findAll({
+      where: { productoId: { [Op.in]: productIds } },
+      include: [
+        {
+          model: NotasComprobante,
+          attributes: [
+            'id',
+            'serie',
+            'numero_serie',
+            'fecha_emision',
+            'tipo_nota',
+          ],
+          where: {
+            estado: 'ACEPTADA',
+            ...(startDate && endDate
+              ? { fecha_emision: { [Op.between]: [startDate, endDate] } }
+              : {}),
+          },
+        },
+      ],
+    });
+
+    // 5. Agrupar relaciones por productoId
+    const cotizacionesPorProducto = new Map();
+    const ordenesPorProducto = new Map();
+    const notasPorProducto = new Map();
+
+    cotizaciones.forEach((c) => {
+      const id = c.productoId;
+      if (!cotizacionesPorProducto.has(id)) cotizacionesPorProducto.set(id, []);
+      cotizacionesPorProducto.get(id).push(c);
+    });
+
+    ordenesCompra.forEach((o) => {
+      const id = o.productoId;
+      if (!ordenesPorProducto.has(id)) ordenesPorProducto.set(id, []);
+      ordenesPorProducto.get(id).push(o);
+    });
+
+    notas.forEach((n) => {
+      const id = n.productoId;
+      if (!notasPorProducto.has(id)) notasPorProducto.set(id, []);
+      notasPorProducto.get(id).push(n);
+    });
+
+    // 6. Unir relaciones sin fusionar productos
+    const productosCompletos = allProducts.map((producto) => {
+      const plainProduct = producto.get({ plain: true });
+
+      return {
+        ...plainProduct,
+        productosCotizaciones: cotizacionesPorProducto.get(producto.id) || [],
+        productosOrdenCompras: ordenesPorProducto.get(producto.id) || [],
+        productosNotas: notasPorProducto.get(producto.id) || [],
+      };
+    });
+
+    return res.status(200).json({
+      status: 'Success',
+      results: productosCompletos.length,
+      misProductos: productosCompletos,
+    });
+  } catch (error) {
+    console.error('Error en findAllKardex:', error);
+    return res.status(500).json({
+      status: 'Error',
+      message: 'Error al procesar la consulta de kardex',
+      error: error.message,
+    });
   }
-
-  return res.status(200).json({
-    status: 'Success',
-    results: misProductos.length,
-    misProductos,
-  });
 });
 
 export const findOne = catchAsync(async (req, res, next) => {
