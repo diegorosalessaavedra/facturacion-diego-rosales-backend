@@ -47,6 +47,6 @@ export const getNotaSConfig = async (tipo_nota, tipo_comprobante) => {
 
   return {
     ...config,
-    numeroSerie: existingComprobantes.length + 8,
+    numeroSerie: existingComprobantes.length + Number(process.env.NUMERO_NOTA),
   };
 };
