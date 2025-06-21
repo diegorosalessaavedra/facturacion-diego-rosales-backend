@@ -18,6 +18,12 @@ router.get(
 
 router.post('/', comprobantesElectronicosController.create);
 
+router.get(
+  '/anular/:id',
+  comprobantesElectronicosMiddleware.validExistComprobantesElectronicosIncluide,
+  comprobantesElectronicosController.anularComprobante
+);
+
 router
   .route('/:id')
   .post(
