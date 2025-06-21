@@ -1,35 +1,56 @@
 import { ComprobantesElectronicos } from '../modules/comprobantes/filesComprobanteElectronicos/comprobantesElectronicos/comprobantesElectronicos.model.js';
 import { AppError } from './AppError.js';
+import { XMLParser } from 'fast-xml-parser';
 
 const COMPROBANTE_TYPES = {
   NOTA_VENTA: {
     name: 'NOTA DE VENTA',
     serie: process.env.SERIE_NOTA,
   },
+
+  MERMA: {
+    name: 'MERMA',
+    serie: process.env.SERIE_MERMA,
+  },
   FACTURA: {
-    tipoDoc: '01',
     name: 'FACTURA ELECTRÓNICA',
+    tipoDoc: '01',
     serie: process.env.SERIE_FACTURA,
-    url: process.env.LARAVEL_URL + '/api/emitir-comprobante',
+    url: `${process.env.LARAVEL_URL}/api/emitir-comprobante`,
   },
   BOLETA: {
     name: 'BOLETA DE VENTA',
     tipoDoc: '03',
     serie: process.env.SERIE_BOLETA,
-    url: process.env.LARAVEL_URL + '/api/emitir-comprobante',
+    url: `${process.env.LARAVEL_URL}/api/emitir-comprobante`,
   },
 };
 
-// Utility functions
+const TASA_IGV = 0.18; // MEJORA: Evita "números mágicos". Fácil de actualizar si la tasa cambia.
+
+// --- Funciones de Utilidad ---
+
+/**
+ * Formatea un número con ceros a la izquierda hasta alcanzar una longitud deseada.
+ * @param {number | string | null | undefined} number - El número a formatear.
+ * @param {number} length - La longitud final del string.
+ * @returns {string | null} El número formateado o null si la entrada es nula/indefinida.
+ */
 export const formatWithLeadingZeros = (number, length) => {
-  if (number === null || number === undefined) return null;
-  return number.toString().padStart(length, '0');
+  if (number === null || number === undefined) {
+    return null;
+  }
+  return String(number).padStart(length, '0');
 };
 
+/**
+ * Valida los campos requeridos en el cuerpo de una solicitud de creación.
+ * Lanza un AppError si la validación falla.
+ * @param {object} body - El cuerpo de la solicitud (req.body).
+ */
 export const validateCreateRequest = (body) => {
   const requiredFields = [
     'tipoComprobante',
-    'condicionPago',
     'fecEmision',
     'fecVencimiento',
     'clienteId',
@@ -39,28 +60,41 @@ export const validateCreateRequest = (body) => {
     'productos',
   ];
 
-  const missingFields = requiredFields.filter((field) => !body[field]);
+  const missingFields = requiredFields.filter((field) => !(field in body));
+
   if (missingFields.length > 0) {
-    new AppError(`Campos requeridos faltantes: ${missingFields.join(', ')}`);
+    // CORRECCIÓN CRÍTICA: Se debe usar 'throw' para que el error detenga la ejecución.
+    throw new AppError(
+      `Campos requeridos faltantes: ${missingFields.join(', ')}`,
+      400
+    );
   }
 
   if (!Array.isArray(body.productos) || body.productos.length === 0) {
-    new AppError('Se requiere al menos un producto');
+    // CORRECCIÓN CRÍTICA: También necesita 'throw'.
+    throw new AppError(
+      'El campo "productos" debe ser un array con al menos un elemento.',
+      400
+    );
   }
 };
 
-// Helper functions
-export const calculateTotals = (productos) => {
+// --- Funciones de Lógica de Negocio ---
+
+export const calculateTotals = (productos = []) => {
   const totalPrecioProductos = productos.reduce(
-    (sum, producto) => sum + Number(parseFloat(producto.total || 0)),
+    (sum, producto) => sum + parseFloat(producto.total || 0),
     0
   );
-  const totalValorVenta = Number(totalPrecioProductos / 1.18);
+
+  // MEJORA: Se usa la constante TASA_IGV para mayor claridad y mantenibilidad.
+  const totalValorVenta = totalPrecioProductos / (1 + TASA_IGV);
+  const totalIgv = totalValorVenta * TASA_IGV;
 
   return {
-    totalPrecioProductos: Number(totalPrecioProductos),
-    totalValorVenta: totalValorVenta,
-    totalIgv: Number(totalValorVenta * 0.18),
+    totalPrecioProductos,
+    totalValorVenta,
+    totalIgv,
   };
 };
 
@@ -70,75 +104,102 @@ export const getComprobanteConfig = async (tipoComprobante) => {
   );
 
   if (!config) {
-    throw new Error(`Tipo de comprobante no válido: ${tipoComprobante}`);
+    throw new AppError(
+      `Tipo de comprobante no válido: ${tipoComprobante}`,
+      400
+    );
+  }
+  if (!config.serie) {
+    throw new AppError(
+      `La serie para "${tipoComprobante}" no está configurada en las variables de entorno.`,
+      500
+    );
   }
 
-  let existingComprobantes = [];
+  // MEJORA DE RENDIMIENTO: Usa .count() en lugar de .findAll().
+  // Esto es mucho más eficiente, ya que la BD solo devuelve un número, no todos los objetos.
+  const cantidadExistente = await ComprobantesElectronicos.count({
+    where: {
+      tipoComprobante: config.name,
+      serie: config.serie,
+    },
+  });
 
-  if (tipoComprobante === 'FACTURA ELECTRÓNICA') {
-    existingComprobantes = await ComprobantesElectronicos.findAll({
-      where: {
-        tipoComprobante: 'FACTURA ELECTRÓNICA',
-        serie: process.env.SERIE_FACTURA,
-      },
-    });
-  } else if (tipoComprobante === 'BOLETA DE VENTA') {
-    existingComprobantes = await ComprobantesElectronicos.findAll({
-      where: {
-        tipoComprobante: 'BOLETA DE VENTA',
-        serie: process.env.SERIE_BOLETA,
-      },
-    });
-  } else if (tipoComprobante === 'NOTA DE VENTA') {
-    existingComprobantes = await ComprobantesElectronicos.findAll({
-      where: {
-        tipoComprobante: 'NOTA DE VENTA',
-        serie: process.env.SERIE_NOTA,
-      },
-    });
+  // MEJORA: Lógica simplificada para calcular el siguiente número.
+  let siguienteNumero;
+  if (config.name === 'MERMA') {
+    siguienteNumero = cantidadExistente + 1;
+  } else {
+    const incremento = Number(process.env.MAS_NUMERO) || 0; // Fallback a 0 si no está definido
+    siguienteNumero = cantidadExistente + incremento;
   }
 
   return {
     ...config,
-    numeroSerie: existingComprobantes.length + Number(process.env.MAS_NUMERO),
+    numeroSerie: siguienteNumero,
   };
 };
 
 export const extractDigestValue = (xmlBase64) => {
+  if (!xmlBase64) return null;
+
   try {
     const xmlString = Buffer.from(xmlBase64, 'base64').toString('utf-8');
-    const digestMatch = xmlString.match(
-      /<ds:DigestValue>(.*?)<\/ds:DigestValue>/
-    );
-    return digestMatch ? digestMatch[1] : null;
+
+    // MEJORA DE ROBUSTEZ: Usar un parser de XML es mucho más seguro que RegEx.
+    // RegEx puede fallar con simples espacios o cambios en los atributos del XML.
+    const parser = new XMLParser({ ignoreAttributes: false });
+    const jsonObj = parser.parse(xmlString);
+
+    // La ruta exacta puede necesitar ajuste según la estructura de tu XML de respuesta SUNAT.
+    // Esta es una ruta común para encontrar el DigestValue.
+    const digestValue =
+      jsonObj?.['soap-env:Envelope']?.['soap-env:Body']?.[
+        'ser:sendBillResponse'
+      ]?.['ser:ticket']?.['content']?.['ApplicationResponse']?.[
+        'ds:Signature'
+      ]?.['ds:SignedInfo']?.['ds:Reference']?.['ds:DigestValue'];
+
+    return digestValue || null;
   } catch (error) {
-    console.error('Error extracting DigestValue:', error);
+    console.error('Error al parsear XML o extraer DigestValue:', error);
     return null;
   }
 };
 
-export const generateQRContent = ({
-  emisorRuc,
-  tipoComprobante,
-  serie,
-  correlativo,
-  igv,
-  total,
-  fecha,
-  tipoDocCliente,
-  numeroDocCliente,
-  digestValue,
-}) => {
-  return [
+/**
+ * Genera el contenido para el código QR según el estándar de SUNAT.
+ * @param {object} data - Objeto con todos los campos necesarios para el QR.
+ * @returns {string} El string con los campos concatenados por '|'.
+ */
+export const generateQRContent = (data) => {
+  const {
     emisorRuc,
     tipoComprobante,
     serie,
     correlativo,
-    igv.toFixed(2),
-    total.toFixed(2),
+    igv,
+    total,
     fecha,
     tipoDocCliente,
     numeroDocCliente,
     digestValue,
-  ].join('|');
+  } = data;
+
+  // MEJORA: Se asegura de que todos los campos sean válidos y no causen errores.
+  // Los valores nulos o indefinidos se convierten en strings vacíos.
+  const fields = [
+    emisorRuc,
+    tipoComprobante,
+    serie,
+    correlativo,
+    igv?.toFixed(2), // Optional chaining por si igv es null/undefined
+    total?.toFixed(2), // Optional chaining por si total es null/undefined
+    fecha,
+    tipoDocCliente,
+    numeroDocCliente,
+    digestValue,
+  ];
+
+  return fields.map((field) => field ?? '').join('|');
 };

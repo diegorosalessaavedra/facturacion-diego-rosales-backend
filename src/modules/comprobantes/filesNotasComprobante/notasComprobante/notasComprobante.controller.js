@@ -198,8 +198,8 @@ export const create = catchAsync(async (req, res, next) => {
             },
           }
         );
-        console.log(response.data);
-        if (response.data?.cdr?.estado !== 'ACEPTADA') {
+
+        if (response.data.cdr?.estado === 'RECHAZADA') {
           facturaAceptada = false;
         }
 

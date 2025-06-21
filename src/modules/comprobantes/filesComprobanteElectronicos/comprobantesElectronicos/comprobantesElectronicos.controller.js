@@ -830,7 +830,6 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
         }
 
         facturaAceptada = true;
-        // Si llegamos aquí, el comprobante fue aceptado
         const digestValue = extractDigestValue(response.data.xml);
         const qrContent = generateQRContent({
           emisorRuc: process.env.COMPANY_RUC,
@@ -983,6 +982,66 @@ export const update = catchAsync(async (req, res, next) => {
     message: 'Comprobante actualizado correctamente',
     data: comprobante,
   });
+});
+
+export const anularComprobante = catchAsync(async (req, res, next) => {
+  const { comprobanteElectronico } = req; // Obtenido de un middleware previo
+
+  const transaction = await db.transaction();
+
+  try {
+    if (comprobanteElectronico.estado === 'ANULADO') {
+      throw new AppError('Este comprobante ya ha sido anulado.', 400);
+    }
+
+    for (const productoVendido of comprobanteElectronico.productos) {
+      const miProducto = await MisProductos.findOne({
+        where: { id: productoVendido.productoId },
+        lock: true, // Se bloquea la fila para evitar concurrencia
+        transaction,
+      });
+
+      if (!miProducto) {
+        throw new AppError(
+          `Producto con ID ${productoVendido.productoId} no encontrado en el inventario.`,
+          404
+        );
+      }
+
+      // Si el producto maneja stock, se actualiza.
+      if (miProducto.conStock) {
+        const stockActual = parseFloat(miProducto.stock);
+        const cantidadDevuelta = parseFloat(productoVendido.cantidad);
+
+        await miProducto.update(
+          {
+            stock: stockActual + cantidadDevuelta,
+          },
+          { transaction }
+        );
+      }
+    }
+
+    await comprobanteElectronico.update(
+      {
+        estado: 'ANULADO',
+      },
+      { transaction }
+    );
+
+    // Si todo fue exitoso, se confirman los cambios en la base de datos.
+    await transaction.commit();
+
+    res.status(200).json({
+      status: 'success',
+      message:
+        'El comprobante se anuló correctamente y el stock ha sido restaurado.',
+    });
+  } catch (error) {
+    // Si ocurre cualquier error, se revierten todos los cambios.
+    await transaction.rollback();
+    next(error); // Se pasa el error al manejador global.
+  }
 });
 
 export const deleteElement = catchAsync(async (req, res, next) => {

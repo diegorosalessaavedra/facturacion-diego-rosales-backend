@@ -40,7 +40,8 @@ const ComprobantesElectronicos = db.define('comprobantesElectronicos', {
     type: DataTypes.ENUM(
       'NOTA DE VENTA',
       'FACTURA ELECTRÓNICA',
-      'BOLETA DE VENTA'
+      'BOLETA DE VENTA',
+      'MERMA'
     ),
     allowNull: false,
   },
@@ -70,7 +71,7 @@ const ComprobantesElectronicos = db.define('comprobantesElectronicos', {
     allowNull: true,
   },
   estado: {
-    type: DataTypes.ENUM('ACEPTADA', 'RECHAZADA', 'PENDIENTE'),
+    type: DataTypes.ENUM('ACEPTADA', 'RECHAZADA', 'PENDIENTE', 'ANULADO'),
     allowNull: false,
     defaultValue: 'ACEPTADA',
   },

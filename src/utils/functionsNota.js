@@ -40,13 +40,26 @@ export const getNotaSConfig = async (tipo_nota, tipo_comprobante) => {
   if (!config) {
     throw new AppError(`Tipo de comprobante no válido: ${tipo_nota}`);
   }
+  let existingComprobantes = [];
 
-  const existingComprobantes = await NotasComprobante.findAll({
-    where: { tipo_nota, tipo_comprobante },
-  });
+  if (tipo_comprobante === 'FACTURA ELECTRÓNICA') {
+    existingComprobantes = await ComprobantesElectronicos.findAll({
+      where: {
+        tipoComprobante: 'FACTURA ELECTRÓNICA',
+        serie: process.env.SERIE_FACTURA,
+      },
+    });
+  } else if (tipo_comprobante === 'BOLETA DE VENTA') {
+    existingComprobantes = await ComprobantesElectronicos.findAll({
+      where: {
+        tipoComprobante: 'BOLETA DE VENTA',
+        serie: process.env.SERIE_BOLETA,
+      },
+    });
+  }
 
   return {
     ...config,
-    numeroSerie: existingComprobantes.length + Number(process.env.NUMERO_NOTA),
+    numeroSerie: existingComprobantes.length + Number(process.env.MAS_NUMERO),
   };
 };
