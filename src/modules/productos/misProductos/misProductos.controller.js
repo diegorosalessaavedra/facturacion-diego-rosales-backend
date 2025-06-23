@@ -12,6 +12,7 @@ import { Cotizaciones } from '../../ventas/cotizaciones/cotizaciones.model.js';
 import { ProductosOrdenCompras } from '../../compras/productosOrdenCompras/productosOrdenCompras.model.js';
 import { OrdenesCompra } from '../../compras/ordenesCompra/ordenesCompra.model.js';
 import { Clientes } from '../../clientesProveedores/clientes/clientes.model.js';
+import { ProductosComprobanteElectronico } from '../../comprobantes/filesComprobanteElectronicos/productosComprobanteElectronico/productosComprobanteElectronico.model.js';
 
 export const findAll = catchAsync(async (req, res, next) => {
   const misProductos = await MisProductos.findAll({});
@@ -148,10 +149,35 @@ export const findAllKardex = catchAsync(async (req, res, next) => {
       ],
     });
 
+    const mermas = await ProductosComprobanteElectronico.findAll({
+      where: { productoId: { [Op.in]: productIds } },
+      include: [
+        {
+          model: ComprobantesElectronicos,
+          attributes: [
+            'id',
+            'serie',
+            'numeroSerie',
+            'fechaEmision',
+            'tipoComprobante',
+            'estado',
+          ],
+          where: {
+            estado: 'ACEPTADA',
+            tipoComprobante: 'MERMA',
+            ...(startDate && endDate
+              ? { fechaEmision: { [Op.between]: [startDate, endDate] } }
+              : {}),
+          },
+        },
+      ],
+    });
+
     // 5. Agrupar relaciones por productoId
     const cotizacionesPorProducto = new Map();
     const ordenesPorProducto = new Map();
     const notasPorProducto = new Map();
+    const mermasPorProducto = new Map();
 
     cotizaciones.forEach((c) => {
       const id = c.productoId;
@@ -170,6 +196,11 @@ export const findAllKardex = catchAsync(async (req, res, next) => {
       if (!notasPorProducto.has(id)) notasPorProducto.set(id, []);
       notasPorProducto.get(id).push(n);
     });
+    mermas.forEach((n) => {
+      const id = n.productoId;
+      if (!mermasPorProducto.has(id)) mermasPorProducto.set(id, []);
+      mermasPorProducto.get(id).push(n);
+    });
 
     // 6. Unir relaciones sin fusionar productos
     const productosCompletos = allProducts.map((producto) => {
@@ -180,6 +211,7 @@ export const findAllKardex = catchAsync(async (req, res, next) => {
         productosCotizaciones: cotizacionesPorProducto.get(producto.id) || [],
         productosOrdenCompras: ordenesPorProducto.get(producto.id) || [],
         productosNotas: notasPorProducto.get(producto.id) || [],
+        productosMerma: mermasPorProducto.get(producto.id) || [],
       };
     });
 
