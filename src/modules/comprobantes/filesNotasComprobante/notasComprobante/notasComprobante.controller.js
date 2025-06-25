@@ -296,11 +296,9 @@ export const create = catchAsync(async (req, res, next) => {
   } catch (error) {
     await transaction.rollback();
 
-    console.error('Error en createCotizacion:', {
+    console.error('Error :', {
       error: error.message,
       stack: error.stack,
-      cotizacionId: cotizacion.id,
-      clienteId: req.body.clienteId,
     });
 
     next(error);
