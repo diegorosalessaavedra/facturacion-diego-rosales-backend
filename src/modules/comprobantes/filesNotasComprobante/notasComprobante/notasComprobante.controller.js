@@ -150,7 +150,7 @@ export const create = catchAsync(async (req, res, next) => {
             }),
 
         tipo_comprobante: comprobanteConfig.tipoDoc,
-        fechaEmision: fecha_emision,
+        fecha_emision: fecha_emision,
         serie: comprobanteConfig.serie,
         correlativo: formatWithLeadingZeros(comprobanteConfig.numeroSerie, 8),
         serie_documento: comprobanteElectronico.serie,
