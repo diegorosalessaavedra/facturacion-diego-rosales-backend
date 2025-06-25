@@ -130,7 +130,7 @@ export const getComprobanteConfig = async (tipoComprobante) => {
   if (config.name === 'MERMA') {
     siguienteNumero = cantidadExistente + 1;
   } else {
-    const incremento = Number(process.env.MAS_NUMERO) || 0; // Fallback a 0 si no está definido
+    const incremento = Number(process.env.MAS_NUMERO) || 1; // Fallback a 0 si no está definido
     siguienteNumero = cantidadExistente + incremento;
   }
 
