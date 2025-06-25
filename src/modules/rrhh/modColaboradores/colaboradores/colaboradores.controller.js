@@ -43,32 +43,29 @@ export const create = catchAsync(async (req, res, next) => {
       dni_colaborador,
       telefono_colaborador,
       correo_colaborador,
-      nombre_familiar_colaborador,
-      apellidos_familiar_colaborador,
-      telefono_familiar_colaborador,
-      correo_familiar_colaborador,
       direccion_colaborador,
-      numero_casa_colaborador,
       departamento_colaborador,
       provincia_colaborador,
       distrito_colaborador,
-      codigo_postal_colaborador,
+      nombre_contacto_emergencia,
+      apellidos_contacto_emergencia,
+      telefono_contacto_emergencia,
+      vinculo_contacto_emergencia,
       cargo_laboral_id,
-      tipo_empleo_colaborador,
-      educacion_colaborador,
-      nombre_institucion_educativa,
-      especializacion_titulo_colaborador,
+
       archivos_complementarios_names,
     } = req.body;
 
-    const existDni = Colaboradores.findOne({ where: { dni_colaborador } });
+    const existDni = await Colaboradores.findOne({
+      where: { dni_colaborador },
+    });
 
     if (existDni) {
       await transaction.rollback();
       return next(new AppError('El dni ya se encuentra registrado', 400));
     }
 
-    const existTeleFono = Colaboradores.findOne({
+    const existTeleFono = await Colaboradores.findOne({
       where: { telefono_colaborador },
     });
 
@@ -78,11 +75,27 @@ export const create = catchAsync(async (req, res, next) => {
         new AppError('El numero de telefono ya se encuentra registrado', 400)
       );
     }
-    const existCorreo = Colaboradores.findOne({ where: { dni_colaborador } });
+    const existCorreo = await Colaboradores.findOne({
+      where: { correo_colaborador },
+    });
 
     if (existCorreo) {
       await transaction.rollback();
       return next(new AppError('El correo ya se encuentra registrado', 400));
+    }
+
+    const existTelefonoEmergencia = await Colaboradores.findOne({
+      where: { telefono_contacto_emergencia },
+    });
+
+    if (existTelefonoEmergencia) {
+      await transaction.rollback();
+      return next(
+        new AppError(
+          'El telfono del contacto de emergencia  ya se encuentra registrado',
+          400
+        )
+      );
     }
 
     const fotoFile =
@@ -122,38 +135,30 @@ export const create = catchAsync(async (req, res, next) => {
     for (let i = 0; i < complementaryFiles.length; i++) {
       const file = complementaryFiles[i];
       // Usar el nombre proporcionado por el usuario o el nombre original del archivo
-      const fileName =
-        archivos_complementarios_names && archivos_complementarios_names[i]
-          ? archivos_complementarios_names[i]
-          : file.originalname;
+      const fileName = archivos_complementarios_names[i];
 
       // Crear FormData para el archivo complementario actual
       const compFormData = new FormData();
-      compFormData.append('file', file.buffer, {
-        filename: file.originalname, // Envía el nombre original al servicio de subida
-      });
+      compFormData.append('file', file.buffer, file.originalname);
 
       // URL del servicio de Laravel para subir archivos
       const uploadUrl = `${process.env.LARAVEL_URL}/api/colaboradores`; // Considera una ruta específica para complementarios
 
       try {
         // Enviar el archivo complementario al servicio de Laravel
-        const response = await axios.post(uploadUrl, compFormData, {
-          headers: {
-            ...compFormData.getHeaders(),
-          },
-        });
+        const response = await axios.post(uploadUrl, compFormData);
+        console.log(response);
 
         // Guardar la información relevante (nombre ingresado por el usuario y ruta retornada por el servicio)
         uploadedComplementaryFilesInfo.push({
           nombre_archivo: fileName, // Nombre ingresado por el usuario
-          ruta_archivo: response.data.name, // Ruta retornada por el servicio de Laravel
+          ruta_archivo: response.data.filename, // Ruta retornada por el servicio de Laravel
         });
       } catch (error) {
         // Si falla la subida de un archivo complementario, hacer rollback y retornar error
         console.error(
           `Error uploading complementary file ${fileName}:`,
-          error.response?.data || error.message
+          error.response.data
         );
         await transaction.rollback();
         const message =
@@ -173,21 +178,16 @@ export const create = catchAsync(async (req, res, next) => {
         dni_colaborador,
         telefono_colaborador,
         correo_colaborador,
-        nombre_familiar_colaborador,
-        apellidos_familiar_colaborador,
-        telefono_familiar_colaborador,
-        correo_familiar_colaborador,
         direccion_colaborador,
-        numero_casa_colaborador,
         departamento_colaborador,
         provincia_colaborador,
         distrito_colaborador,
-        codigo_postal_colaborador,
+        nombre_contacto_emergencia,
+        apellidos_contacto_emergencia,
+        telefono_contacto_emergencia,
+        vinculo_contacto_emergencia,
         cargo_laboral_id,
-        tipo_empleo_colaborador,
-        educacion_colaborador,
-        nombre_institucion_educativa,
-        especializacion_titulo_colaborador,
+        cv_colaborador: '...',
       },
       { transaction } // Asegurarse de que la creación esté dentro de la transacción
     );
@@ -197,24 +197,15 @@ export const create = catchAsync(async (req, res, next) => {
     // --- Lógica existente para subir el archivo CV ---
     try {
       const fotoFormData = new FormData();
-      fotoFormData.append('file', fotoFile.buffer, {
-        filename: fotoFile.originalname,
-      });
+      fotoFormData.append('file', fotoFile.buffer, fotoFile.originalname);
 
       const uploadUrl = `${process.env.LARAVEL_URL}/api/colaboradores`; // Considera una ruta específica para CV
 
-      const response = await axios.post(uploadUrl, fotoFormData, {
-        headers: {
-          ...fotoFormData.getHeaders(),
-        },
-      });
+      const response = await axios.post(uploadUrl, fotoFormData);
 
-      foto_colaborador_path = response.data.name; // Obtener la ruta retornada por el servicio
+      foto_colaborador_path = response.data.filename; // Obtener la ruta retornada por el servicio
     } catch (error) {
-      console.error(
-        'Error uploading photo file:',
-        error.response?.data || error.message
-      );
+      console.error('Error uploading photo file:', error.response);
       await transaction.rollback();
       const message =
         error.response?.data?.message ||
@@ -230,19 +221,13 @@ export const create = catchAsync(async (req, res, next) => {
     // --- Lógica existente para subir el archivo CV ---
     try {
       const cvFormData = new FormData();
-      cvFormData.append('file', cvFile.buffer, {
-        filename: cvFile.originalname,
-      });
+      cvFormData.append('file', cvFile.buffer, cvFile.originalname);
 
       const uploadUrl = `${process.env.LARAVEL_URL}/api/colaboradores`; // Considera una ruta específica para CV
 
-      const response = await axios.post(uploadUrl, cvFormData, {
-        headers: {
-          ...cvFormData.getHeaders(),
-        },
-      });
+      const response = await axios.post(uploadUrl, cvFormData);
 
-      cv_colaborador_path = response.data.name; // Obtener la ruta retornada por el servicio
+      cv_colaborador_path = response.data.filename; // Obtener la ruta retornada por el servicio
     } catch (error) {
       console.error(
         'Error uploading CV file:',
@@ -289,7 +274,6 @@ export const create = catchAsync(async (req, res, next) => {
       colaborador,
     });
   } catch (error) {
-    // Si ocurre cualquier error no manejado, hacer rollback
     console.error('Error in create colaborador transaction:', error);
     await transaction.rollback();
     return next(

@@ -6,28 +6,28 @@ const COMPROBANTE_TYPES = {
     tipoDoc: '07',
     name: 'NOTA DE CREDITO',
     comprobante: 'FACTURA ELECTRÓNICA',
-    serie: 'FC02',
+    serie: 'FC03',
     url: process.env.LARAVEL_URL + '/api/nota-credito',
   },
   NOTA_CREDITO_BOLETA: {
     tipoDoc: '07',
     name: 'NOTA DE CREDITO',
     comprobante: 'BOLETA DE VENTA',
-    serie: 'BC02',
+    serie: 'BC03',
     url: process.env.LARAVEL_URL + '/api/nota-credito',
   },
   NOTA_DEBITO_FACTURA: {
     tipoDoc: '08',
     name: 'NOTA DE DEBITO',
     comprobante: 'FACTURA ELECTRÓNICA',
-    serie: 'FD02',
+    serie: 'FD03',
     url: process.env.LARAVEL_URL + '/api/nota-credito',
   },
   NOTA_DEBITO_BOLETA: {
     tipoDoc: '08',
     name: 'NOTA DE DEBITO',
     comprobante: 'BOLETA DE VENTA',
-    serie: 'BD02',
+    serie: 'BD03',
     url: process.env.LARAVEL_URL + '/api/nota-credito',
   },
 };
@@ -40,26 +40,13 @@ export const getNotaSConfig = async (tipo_nota, tipo_comprobante) => {
   if (!config) {
     throw new AppError(`Tipo de comprobante no válido: ${tipo_nota}`);
   }
-  let existingComprobantes = [];
 
-  if (tipo_comprobante === 'FACTURA ELECTRÓNICA') {
-    existingComprobantes = await ComprobantesElectronicos.findAll({
-      where: {
-        tipoComprobante: 'FACTURA ELECTRÓNICA',
-        serie: process.env.SERIE_FACTURA,
-      },
-    });
-  } else if (tipo_comprobante === 'BOLETA DE VENTA') {
-    existingComprobantes = await ComprobantesElectronicos.findAll({
-      where: {
-        tipoComprobante: 'BOLETA DE VENTA',
-        serie: process.env.SERIE_BOLETA,
-      },
-    });
-  }
+  const existingComprobantes = await NotasComprobante.findAll({
+    where: { tipo_nota, tipo_comprobante, serie: config.serie },
+  });
 
   return {
     ...config,
-    numeroSerie: existingComprobantes.length + Number(process.env.MAS_NUMERO),
+    numeroSerie: existingComprobantes.length,
   };
 };

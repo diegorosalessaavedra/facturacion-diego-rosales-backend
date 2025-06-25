@@ -39,6 +39,7 @@ import { docComplemColaboradoresRouter } from './modules/rrhh/modColaboradores/d
 import { descanzoMedicoRouter } from './modules/rrhh/modDescanzoMedico/descanzoMedico/descanzoMedico.routes.js';
 import { vacacionesRouter } from './modules/rrhh/modVacaciones/vacaciones/vacaciones.routes.js';
 import { vacaionesSolicitadasRouter } from './modules/rrhh/modVacaciones/vacionesSolicitadas/vacionesSolicitadas.routes.js';
+import { contratosRouter } from './modules/rrhh/modColaboradores/contratos/contratos.routes.js';
 
 const app = express();
 
@@ -127,6 +128,8 @@ app.use(
   '/api/v1/rrhh/doc-complementarios-colaborador',
   docComplemColaboradoresRouter
 );
+app.use('/api/v1/rrhh/contratos', contratosRouter);
+
 // descanzo medico
 app.use('/api/v1/rrhh/descanzo-medico', descanzoMedicoRouter);
 

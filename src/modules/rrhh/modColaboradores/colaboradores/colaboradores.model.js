@@ -39,29 +39,10 @@ const Colaboradores = db.define('colaboradores', {
     allowNull: false,
     unique: true,
   },
-
-  nombre_familiar_colaborador: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  apellidos_familiar_colaborador: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  telefono_familiar_colaborador: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    unique: true,
-  },
-
   direccion_colaborador: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  // numero_casa_colaborador: {
-  //   type: DataTypes.STRING,
-  //   allowNull: false,
-  // },
   departamento_colaborador: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -74,54 +55,46 @@ const Colaboradores = db.define('colaboradores', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  // codigo_postal_colaborador: {
-  //   type: DataTypes.STRING,
-  //   allowNull: false,
-  // },
+  // contacto de emergencia
+  nombre_contacto_emergencia: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  apellidos_contacto_emergencia: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  telefono_contacto_emergencia: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+  },
+  vinculo_contacto_emergencia: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  // cargo laboral
   cargo_laboral_id: {
     type: DataTypes.INTEGER,
-    allowNull: true,
-  },
-  tipo_empleo_colaborador: {
-    type: DataTypes.ENUM(
-      'Jornada completa',
-      'Jornada parcial',
-      'Autónomo',
-      'Profesional independiente',
-      'Contrato temporal',
-      'Contrato de prácticas',
-      'Temporal'
-    ),
     allowNull: false,
-    defaultValue: 'Jornada completa',
   },
-  educacion_colaborador: {
-    type: DataTypes.ENUM(
-      'Sin estudios',
-      'Primaria completa',
-      'Secundaria completa',
-      'Estudios técnicos',
-      'Estudios universitarios (en curso)',
-      'Bachiller universitario',
-      'Titulado universitario',
-      'Estudios de posgrado (Maestría)',
-      'Estudios de posgrado (Doctorado)',
-      'Autodidacta / Formación independiente'
-    ),
-    allowNull: false,
-    defaultValue: 'Secundaria completa',
-  },
-  nombre_institucion_educativa: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  especializacion_titulo_colaborador: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
+  // tipo_contrato_colaborador: {
+  //   type: DataTypes.ENUM(
+  //     'Jornada completa',
+  //     'Jornada parcial',
+  //     'Autónomo',
+  //     'Profesional independiente',
+  //     'Contrato temporal',
+  //     'Contrato de prácticas',
+  //     'Temporal'
+  //   ),
+  //   allowNull: false,
+  //   defaultValue: 'Jornada completa',
+  // },
+
   cv_colaborador: {
     type: DataTypes.TEXT,
-    allowNull: true,
+    allowNull: false,
   },
 });
 

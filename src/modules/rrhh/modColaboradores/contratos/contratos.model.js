@@ -1,7 +1,7 @@
 import { DataTypes } from 'sequelize';
 import { db } from '../../../../db/db.config.js';
 
-const Vacaciones = db.define('vacaciones', {
+const Contratos = db.define('contratos', {
   id: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -12,19 +12,27 @@ const Vacaciones = db.define('vacaciones', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-  contrato_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
-  periodo: {
+  tipo_contrato: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  dias_disponibles: {
-    type: DataTypes.INTEGER,
+  fecha_inicio: {
+    type: DataTypes.STRING,
     allowNull: false,
-    defaultValue: 15,
+  },
+  fecha_final: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  documento_contrato: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  estado_contrato: {
+    type: DataTypes.ENUM('vigente', 'expirado'),
+    allowNull: false,
+    defaultValue: 'vigente',
   },
 });
 
-export { Vacaciones };
+export { Contratos };
