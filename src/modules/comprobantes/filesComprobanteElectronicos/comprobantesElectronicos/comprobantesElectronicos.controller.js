@@ -641,7 +641,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
     const { totalOperGratuitas, totalIgvGratuitas } = productos.reduce(
       (acc, prod) => {
         const cantidad = Number(prod.cantidad);
-        const valorRefUnitario = Number(prod.valorReferencialUnitario);
+        const valorRefUnitario = Number(prod.precioUnitario);
         if (isNaN(cantidad) || isNaN(valorRefUnitario)) {
           throw new AppError(
             'La cantidad y el valorReferencialUnitario deben ser números.',
