@@ -5,6 +5,7 @@ import * as vacaionesSolicitadasMiddleware from './vacionesSolicitadas.middlewar
 import * as vacacionesMiddleware from '../vacaciones/vacaciones.middleware.js';
 
 import * as authMiddleware from '../../../../auth/auth.middleware.js';
+import { upload } from '../../../../utils/multer.js';
 
 const router = express.Router();
 
@@ -25,6 +26,7 @@ router
     vacaionesSolicitadasController.create
   )
   .post(
+    upload.single('file'),
     vacacionesMiddleware.validExistVacaciones,
     vacaionesSolicitadasController.create
   )

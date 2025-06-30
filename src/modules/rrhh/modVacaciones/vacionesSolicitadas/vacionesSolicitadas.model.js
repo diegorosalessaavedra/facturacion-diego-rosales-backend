@@ -16,6 +16,10 @@ const VacionesSolicitadas = db.define('vacaciones_solicitadas', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  fecha_solicitud: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   fecha_inicio: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -28,7 +32,7 @@ const VacionesSolicitadas = db.define('vacaciones_solicitadas', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  motivo_vacaciones: {
+  solicitud_adjunto: {
     type: DataTypes.STRING,
     allowNull: false,
   },
@@ -38,7 +42,7 @@ const VacionesSolicitadas = db.define('vacaciones_solicitadas', {
     defaultValue: false,
   },
   pendiente_autorizacion: {
-    type: DataTypes.ENUM('PENDIENTE', 'ACEPTADO', 'RECHAZADO'),
+    type: DataTypes.ENUM('PENDIENTE', 'ACEPTADO', 'RECHAZADO', 'ANULADO'),
     allowNull: false,
     defaultValue: 'PENDIENTE',
   },

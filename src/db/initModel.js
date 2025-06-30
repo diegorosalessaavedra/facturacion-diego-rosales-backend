@@ -27,6 +27,8 @@ import { DocCompleColaboradores } from '../modules/rrhh/modColaboradores/docComp
 import { DescanzoMedico } from '../modules/rrhh/modDescanzoMedico/descanzoMedico/descanzoMedico.model.js';
 import { Vacaciones } from '../modules/rrhh/modVacaciones/vacaciones/vacaciones.model.js';
 import { VacionesSolicitadas } from '../modules/rrhh/modVacaciones/vacionesSolicitadas/vacionesSolicitadas.model.js';
+import { Contratos } from '../modules/rrhh/modColaboradores/contratos/contratos.model.js';
+import { Memos } from '../modules/rrhh/modColaboradores/memos/memos.model.js';
 
 const initModel = () => {
   Cotizaciones.belongsTo(User, { foreignKey: 'usuarioId', as: 'usario' });
@@ -290,6 +292,25 @@ const initModel = () => {
   });
 
   VacionesSolicitadas.belongsTo(Colaboradores, {
+    foreignKey: 'colaborador_id',
+    as: 'colaborador',
+  });
+
+  Colaboradores.hasMany(Contratos, {
+    foreignKey: 'colaborador_id',
+    as: 'contratos',
+  });
+
+  Contratos.belongsTo(Colaboradores, {
+    foreignKey: 'colaborador_id',
+    as: 'colaborador',
+  });
+  Colaboradores.hasMany(Memos, {
+    foreignKey: 'colaborador_id',
+    as: 'memos',
+  });
+
+  Memos.belongsTo(Colaboradores, {
     foreignKey: 'colaborador_id',
     as: 'colaborador',
   });

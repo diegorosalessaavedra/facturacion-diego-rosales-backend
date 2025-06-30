@@ -49,6 +49,11 @@ const ComprobantesElectronicos = db.define('comprobantesElectronicos', {
     type: DataTypes.ENUM('VENTA INTERNA', 'OPERACIÓN SUJETA A DETRACCIÓN'),
     allowNull: false,
   },
+  tipo_factura: {
+    type: DataTypes.ENUM('VENTA', 'GRATUITA'),
+    defaultValue: 'VENTA',
+    allowNull: false,
+  },
 
   total_valor_venta: {
     type: DataTypes.DECIMAL(20, 2),

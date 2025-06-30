@@ -1,3 +1,4 @@
+import { AppError } from '../../../../utils/AppError.js';
 import { catchAsync } from '../../../../utils/catchAsync.js';
 import { Contratos } from './contratos.model.js';
 

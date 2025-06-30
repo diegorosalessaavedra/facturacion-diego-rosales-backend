@@ -582,11 +582,13 @@ export const create = catchAsync(async (req, res, next) => {
 });
 
 export const createCotizacion = catchAsync(async (req, res, next) => {
+  // 1. VALIDACIÓN Y DESTRUCTRING DE LA PETICIÓN
   validateCreateRequest(req.body);
   const { cotizacion } = req;
 
   const {
     tipoComprobante,
+    tipo_factura, // Puede ser 'VENTA' o 'GRATUITA'
     fecEmision,
     fecVencimiento,
     clienteId,
@@ -611,20 +613,150 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
     );
   }
 
+  if (!['VENTA', 'GRATUITA'].includes(tipo_factura)) {
+    throw new AppError(
+      "El campo 'tipoFactura' es requerido y debe ser 'VENTA' o 'GRATUITA'",
+      400
+    );
+  }
+
   const cliente = await Clientes.findOne({
     where: { id: clienteId },
     rejectOnEmpty: true,
   });
-
-  const { totalPrecioProductos, totalValorVenta, totalIgv } =
-    calculateTotals(productos);
   const comprobanteConfig = await getComprobanteConfig(tipoComprobante);
 
+  // 2. LÓGICA CONDICIONAL: PREPARAR DATOS SEGÚN TIPO DE FACTURA
+  let dataParaGuardarDB = {};
+  let dataParaApiExterna = {};
+
+  if (tipo_factura === 'GRATUITA') {
+    // ---- LÓGICA PARA FACTURA GRATUITA ----
+    if (arrayPagos && arrayPagos.length > 0) {
+      throw new AppError(
+        'Las facturas gratuitas no deben tener pagos asociados.',
+        400
+      );
+    }
+    const { totalOperGratuitas, totalIgvGratuitas } = productos.reduce(
+      (acc, prod) => {
+        const cantidad = Number(prod.cantidad);
+        const valorRefUnitario = Number(prod.valorReferencialUnitario);
+        if (isNaN(cantidad) || isNaN(valorRefUnitario)) {
+          throw new AppError(
+            'La cantidad y el valorReferencialUnitario deben ser números.',
+            400
+          );
+        }
+        const valorVentaItem = cantidad * valorRefUnitario;
+        acc.totalOperGratuitas += valorVentaItem;
+        acc.totalIgvGratuitas += valorVentaItem * 0.18;
+        return acc;
+      },
+      { totalOperGratuitas: 0, totalIgvGratuitas: 0 }
+    );
+    dataParaGuardarDB = {
+      total_valor_venta: 0,
+      total_igv: 0,
+      total_venta: 0,
+      total_oper_gratuitas: totalOperGratuitas.toFixed(2),
+      total_igv_gratuitas: totalIgvGratuitas.toFixed(2),
+      legend:
+        'TRANSFERENCIA GRATUITA DE UN BIEN Y/O SERVICIO PRESTADO GRATUITAMENTE',
+      monto_pendiente: 0,
+    };
+    dataParaApiExterna = {
+      tipo_factura: 'GRATUITA',
+      tipo_operacion: '0101',
+      total_oper_gratuitas: totalOperGratuitas.toFixed(2),
+      total_igv_gratuitas: totalIgvGratuitas.toFixed(2),
+      productos: await Promise.all(
+        productos.map(async (producto) => {
+          const miProducto = await MisProductos.findOne({
+            where: { id: producto.productoId },
+          });
+          if (!miProducto)
+            throw new AppError(
+              `Producto con ID ${producto.productoId} no encontrado`,
+              404
+            );
+          const valorVenta =
+            Number(producto.cantidad) *
+            Number(producto.valorReferencialUnitario);
+          const igv = valorVenta * 0.18;
+          return {
+            codigo: miProducto.codigoSunat,
+            cantidad: producto.cantidad,
+            unidad: miProducto.codUnidad,
+            descripcion: miProducto.nombre,
+            valor_referencial_unitario: Number(
+              producto.valorReferencialUnitario
+            ).toFixed(2),
+            valor_venta: valorVenta.toFixed(2),
+            igv: igv.toFixed(2),
+          };
+        })
+      ),
+    };
+  } else {
+    // ---- LÓGICA PARA FACTURA DE VENTA ----
+    const { totalPrecioProductos, totalValorVenta, totalIgv } =
+      calculateTotals(productos);
+    dataParaGuardarDB = {
+      total_valor_venta: totalValorVenta,
+      total_igv: totalIgv,
+      total_venta: totalPrecioProductos,
+      legend: numeroALetras(totalPrecioProductos),
+      monto_pendiente,
+    };
+    dataParaApiExterna = {
+      tipo_factura: 'VENTA',
+      ...(tipoOperacion === 'VENTA INTERNA'
+        ? { tipo_operacion: '0101' }
+        : {
+            tipo_operacion: '1001',
+            codBienDetraccion,
+            codMedioPago,
+            ctaBancaria,
+            porcentaje,
+            montoDetraccion,
+          }),
+      total_valor_venta: totalValorVenta,
+      total_igv: totalIgv,
+      total_venta: totalPrecioProductos,
+      legend: numeroALetras(totalPrecioProductos),
+      productos: await Promise.all(
+        productos.map(async (producto) => {
+          const miProducto = await MisProductos.findOne({
+            where: { id: producto.productoId },
+          });
+          if (!miProducto)
+            throw new AppError(
+              `Producto con ID ${producto.productoId} no encontrado`,
+              404
+            );
+          const precioUnitarioSinIGV = Number(producto.precioUnitario) / 1.18;
+          const valorVenta = precioUnitarioSinIGV * Number(producto.cantidad);
+          const igv = valorVenta * 0.18;
+          return {
+            codigo: miProducto.codigoSunat,
+            cantidad: producto.cantidad,
+            unidad: miProducto.codUnidad,
+            precio_unitario: precioUnitarioSinIGV.toFixed(2),
+            descripcion: miProducto.nombre,
+            valor_venta: valorVenta.toFixed(2),
+            igv: igv.toFixed(2),
+          };
+        })
+      ),
+    };
+  }
+
+  // 3. TRANSACCIÓN Y CREACIÓN DE REGISTROS EN LA BASE DE DATOS
   let comprobanteElectronico;
   const transaction = await db.transaction();
 
   try {
-    // Create comprobante
     comprobanteElectronico = await ComprobantesElectronicos.create(
       {
         clienteId,
@@ -633,127 +765,77 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
         serie: comprobanteConfig.serie,
         numeroSerie: formatWithLeadingZeros(comprobanteConfig.numeroSerie, 8),
         tipoComprobante,
+        tipo_factura,
         fechaEmision: fecEmision,
         fechaVencimiento: fecVencimiento,
-        total_valor_venta: totalValorVenta,
-        total_igv: totalIgv,
-        total_venta: totalPrecioProductos,
         tipoOperacion,
-        legend: numeroALetras(totalPrecioProductos),
-        monto_pendiente,
         observacion,
         estado: 'PENDIENTE',
+        ...dataParaGuardarDB,
       },
       { transaction }
     );
 
-    if (tipoOperacion === 'OPERACIÓN SUJETA A DETRACCIÓN') {
+    if (
+      tipo_factura === 'VENTA' &&
+      tipoOperacion === 'OPERACIÓN SUJETA A DETRACCIÓN'
+    ) {
       await ComprobanteSujetaDetraccion.create(
         {
           comprobanteElectronicoId: comprobanteElectronico.id,
-          codBienDetraccion: codBienDetraccion,
-          codMedioPago: codMedioPago,
-          ctaBancaria: ctaBancaria,
-          porcentaje: porcentaje,
-          montoDetraccion: montoDetraccion,
+          codBienDetraccion,
+          codMedioPago,
+          ctaBancaria,
+          porcentaje,
+          montoDetraccion,
         },
         { transaction }
       );
     }
-
     await cotizacion.update(
-      {
-        comprobanteElectronicoId: comprobanteElectronico.id,
-      },
+      { comprobanteElectronicoId: comprobanteElectronico.id },
       { transaction }
     );
 
-    // Process payments
-    for (const pago of arrayPagos) {
-      const metodoPago = await MetodosPago.findOne({
-        where: { id: pago.metodoPago },
-        transaction,
-      });
-
-      if (!metodoPago) {
-        throw new AppError('Método de pago no encontrado', 404);
-      }
-
-      await PagosComprobantesElectronicos.create(
-        {
-          comprobanteElectronicoId: comprobanteElectronico.id,
-          metodoPago,
-          operacion: pago.operacion,
-          monto: pago.monto,
-          fecha: pago.fecha,
-        },
-        { transaction }
-      );
-    }
-
-    let productosConStock = [];
-
-    for (const producto of productos) {
-      const miProducto = await MisProductos.findOne({
-        where: { id: producto.productoId },
-        attributes: ['id', 'stock', 'nombre', 'codUnidad', 'conStock'],
-        lock: true,
-        transaction,
-      });
-
-      if (!miProducto) {
-        throw new AppError(
-          `Producto con ID ${producto.productoId} no encontrado`,
-          404
+    if (tipo_factura === 'VENTA') {
+      for (const pago of arrayPagos) {
+        const metodoPago = await MetodosPago.findOne({
+          where: { id: pago.metodoPago },
+          transaction,
+        });
+        if (!metodoPago)
+          throw new AppError('Método de pago no encontrado', 404);
+        await PagosComprobantesElectronicos.create(
+          {
+            comprobanteElectronicoId: comprobanteElectronico.id,
+            metodoPagoId: metodoPago.id,
+            operacion: pago.operacion,
+            monto: pago.monto,
+            fecha: pago.fecha,
+          },
+          { transaction }
         );
       }
+    }
 
-      if (miProducto.conStock) {
-        const stock = parseFloat(miProducto.stock);
-        const cantidad = parseFloat(producto.cantidad);
-
-        if (isNaN(stock) || isNaN(cantidad)) {
-          throw new AppError(
-            `Valores inválidos de stock o cantidad para el producto ${miProducto.nombre}`,
-            400
-          );
-        }
-
-        if (stock < cantidad) {
-          throw new AppError(
-            `Stock insuficiente para el producto ${miProducto.nombre}. Stock actual: ${stock}, Cantidad solicitada: ${cantidad}`,
-            400
-          );
-        }
-      }
-
+    for (const producto of productos) {
       await ProductosComprobanteElectronico.create(
         {
           comprobanteElectronicoId: comprobanteElectronico.id,
           productoId: producto.productoId,
           cantidad: producto.cantidad,
-          precioUnitario: producto.precioUnitario,
+          precioUnitario: producto.precioUnitario || 0,
+          valorReferencialUnitario: producto.valorReferencialUnitario || 0,
           total: producto.total,
         },
-        {
-          transaction,
-          validate: true,
-        }
+        { transaction }
       );
-
-      productosConStock.push({
-        comprobanteElectronicoId: comprobanteElectronico.id,
-        productoId: producto.productoId,
-        cantidad: producto.cantidad,
-        precioUnitario: producto.precioUnitario,
-        total: producto.total,
-      });
     }
 
-    let facturaAceptada = false;
-
+    // 4. ENVÍO AL API EXTERNO DE FACTURACIÓN (PHP)
     if (comprobanteConfig.url) {
-      const dataComprobante = {
+      const dataCompletaParaApi = {
+        ...dataParaApiExterna,
         ...(tipoComprobante === 'FACTURA ELECTRÓNICA'
           ? {
               tipo_documento: '01',
@@ -767,56 +849,15 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
               cliente_num_doc: cliente.numeroDoc,
               cliente_nombre: cliente.nombreApellidos,
             }),
-        ...(tipoOperacion === 'VENTA INTERNA'
-          ? {
-              tipo_operacion: '0101',
-            }
-          : {
-              tipo_operacion: '1001',
-              codBienDetraccion,
-              codMedioPago,
-              ctaBancaria,
-              porcentaje,
-              montoDetraccion,
-            }),
         serie: comprobanteConfig.serie,
         correlativo: formatWithLeadingZeros(comprobanteConfig.numeroSerie, 8),
-        total_valor_venta: totalValorVenta,
-        total_igv: totalIgv,
         fecha_emision: fecEmision,
-        total_venta: totalPrecioProductos,
-        legend: numeroALetras(totalPrecioProductos),
-        productos: await Promise.all(
-          productos.map(async (producto) => {
-            const miProducto = await MisProductos.findOne({
-              where: { id: producto.productoId },
-            });
-
-            if (!miProducto) {
-              throw new AppError('Producto no encontrado', 404);
-            }
-
-            const precioUnitarioSinIGV = Number(producto.precioUnitario) / 1.18;
-            const valorVenta = precioUnitarioSinIGV * Number(producto.cantidad);
-            const igv = valorVenta * 0.18;
-
-            return {
-              codigo: miProducto.codigoSunat,
-              cantidad: producto.cantidad,
-              unidad: miProducto.codUnidad,
-              precio_unitario: precioUnitarioSinIGV,
-              descripcion: miProducto.nombre || 'Producto',
-              valor_venta: valorVenta,
-              igv: igv,
-            };
-          })
-        ),
       };
 
       try {
         const response = await axios.post(
           comprobanteConfig.url,
-          dataComprobante,
+          dataCompletaParaApi,
           {
             headers: {
               'Content-Type': 'application/json',
@@ -826,49 +867,45 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
         );
 
         if (response.data?.cdr?.estado !== 'ACEPTADA') {
-          facturaAceptada = false;
+          throw new AppError(
+            `La SUNAT rechazó el comprobante: ${
+              response.data?.cdr?.description || 'Sin descripción.'
+            }`,
+            400
+          );
         }
 
-        facturaAceptada = true;
         const digestValue = extractDigestValue(response.data.xml);
         const qrContent = generateQRContent({
           emisorRuc: process.env.COMPANY_RUC,
-          tipoComprobante: comprobanteConfig.type,
-          serie: comprobanteConfig.serie,
-          correlativo: formatWithLeadingZeros(comprobanteConfig.numeroSerie, 8),
-          igv: totalIgv,
-          total: totalPrecioProductos,
+          tipoComprobante: dataCompletaParaApi.tipo_documento,
+          serie: dataCompletaParaApi.serie,
+          correlativo: dataCompletaParaApi.correlativo,
+          igv: dataParaGuardarDB.total_igv,
+          total: dataParaGuardarDB.total_venta,
           fecha_emision: fecEmision,
-          tipoDocCliente: tipoComprobante === 'FACTURA ELECTRÓNICA' ? '6' : '1',
+          tipoDocCliente: dataCompletaParaApi.cliente_tipo_doc,
           numeroDocCliente: cliente.numeroDoc,
           digestValue,
         });
 
-        if (facturaAceptada) {
-          for (const productoStock of productosConStock) {
-            const miProducto = await MisProductos.findOne({
-              where: { id: productoStock.productoId },
-              attributes: ['id', 'stock', 'nombre', 'codUnidad', 'conStock'],
-              lock: true,
-              transaction,
-            });
-
-            if (miProducto.conStock) {
-              await miProducto.update(
-                {
-                  stock:
-                    Number(miProducto.stock) - Number(productoStock.cantidad),
-                },
-                {
-                  transaction,
-                  validate: true,
-                }
-              );
-            }
+        // Actualizar stock solo si la factura es aceptada
+        for (const producto of productos) {
+          const miProducto = await MisProductos.findOne({
+            where: { id: producto.productoId },
+            lock: true,
+            transaction,
+          });
+          if (miProducto && miProducto.conStock) {
+            await miProducto.update(
+              {
+                stock: Number(miProducto.stock) - Number(producto.cantidad),
+              },
+              { transaction }
+            );
           }
         }
 
-        // Actualizar con los datos de éxito
         await comprobanteElectronico.update(
           {
             estado: 'ACEPTADA',
@@ -885,12 +922,11 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
           response: error.response?.data,
           stack: error.stack,
         });
-
         await comprobanteElectronico.update(
           {
             estado: 'RECHAZADA',
             observaciones: `Error en servicio externo: ${
-              error.response?.data?.mensaje ||
+              error.response?.data?.error?.message ||
               error.message ||
               'Error desconocido'
             }`,
@@ -898,38 +934,35 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
           { transaction }
         );
         await cotizacion.update(
-          {
-            comprobanteElectronicoId: null,
-          },
+          { comprobanteElectronicoId: null },
           { transaction }
+        );
+        throw new AppError(
+          `Fallo al emitir comprobante: ${
+            error.response?.data?.error?.message || error.message
+          }`,
+          500
         );
       }
     } else {
-      for (const productoStock of productosConStock) {
+      // Caso sin URL (facturación no electrónica o modo de prueba)
+      for (const producto of productos) {
         const miProducto = await MisProductos.findOne({
-          where: { id: productoStock.productoId },
-          attributes: ['id', 'stock', 'nombre', 'codUnidad', 'conStock'],
+          where: { id: producto.productoId },
           lock: true,
           transaction,
         });
-
-        if (miProducto.conStock) {
+        if (miProducto && miProducto.conStock) {
           await miProducto.update(
             {
-              stock: Number(miProducto.stock) - Number(productoStock.cantidad),
+              stock: Number(miProducto.stock) - Number(producto.cantidad),
             },
-            {
-              transaction,
-              validate: true,
-            }
+            { transaction }
           );
         }
       }
-
       await comprobanteElectronico.update(
-        {
-          estado: 'ACEPTADA',
-        },
+        { estado: 'ACEPTADA' },
         { transaction }
       );
     }
@@ -943,14 +976,11 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
     });
   } catch (error) {
     await transaction.rollback();
-
     console.error('Error en createCotizacion:', {
       error: error.message,
       stack: error.stack,
-      cotizacionId: cotizacion.id,
-      clienteId: req.body.clienteId,
+      body: req.body,
     });
-
     next(error);
   }
 });

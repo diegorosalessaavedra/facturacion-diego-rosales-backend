@@ -1,4 +1,5 @@
 import { db } from '../../../../db/db.config.js';
+import { AppError } from '../../../../utils/AppError.js';
 import { catchAsync } from '../../../../utils/catchAsync.js';
 import { formatDate } from '../../../../utils/formateDate.js';
 import { Vacaciones } from '../../modVacaciones/vacaciones/vacaciones.model.js';
@@ -31,8 +32,6 @@ export const create = catchAsync(async (req, res, next) => {
   const { id: colaborador_id } = req.params;
   const { tipo_contrato, fecha_inicio, fecha_final } = req.body;
   const file = req.file;
-
-  console.log(file);
 
   // 1. Validaciones iniciales
   if (!file) {
@@ -112,9 +111,7 @@ export const create = catchAsync(async (req, res, next) => {
 
     // Devolver un error claro al cliente
     const message =
-      error instanceof FileUploadError
-        ? error.message
-        : 'Ocurrió un error al registrar el contrato. Inténtalo nuevamente.';
+      'Ocurrió un error al registrar el contrato. Inténtalo nuevamente.';
 
     return next(new AppError(message, error.statusCode || 500));
   }
@@ -141,6 +138,8 @@ export const deleteElement = catchAsync(async (req, res) => {
   const { contrato } = req;
 
   await contrato.destroy();
+
+  await deleteFileFromLaravel(contrato.documento_contrato);
 
   return res.status(200).json({
     status: 'success',

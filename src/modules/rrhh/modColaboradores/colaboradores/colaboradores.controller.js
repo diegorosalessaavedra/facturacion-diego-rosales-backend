@@ -6,12 +6,16 @@ import { AppError } from '../../../../utils/AppError.js';
 import { db } from '../../../../db/db.config.js';
 import { CargoLaboral } from '../cargoLaboral/cargoLaboral.model.js';
 import { DocCompleColaboradores } from '../docCompleColaboradores/docCompleColaboradores.model.js';
+import { Contratos } from '../contratos/contratos.model.js';
+import { Memos } from '../memos/memos.model.js';
 
 export const findAll = catchAsync(async (req, res, next) => {
   const colaboradores = await Colaboradores.findAll({
     include: [
       { model: CargoLaboral, as: 'cargo_laboral' },
       { model: DocCompleColaboradores, as: 'documentos_complementarios' },
+      { model: Contratos, as: 'contratos' },
+      { model: Memos, as: 'memos' },
     ],
   });
 
