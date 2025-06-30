@@ -681,17 +681,16 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
               404
             );
           const valorVenta =
-            Number(producto.cantidad) *
-            Number(producto.valorReferencialUnitario);
+            Number(producto.cantidad) * Number(producto.precioUnitario);
           const igv = valorVenta * 0.18;
           return {
             codigo: miProducto.codigoSunat,
             cantidad: producto.cantidad,
             unidad: miProducto.codUnidad,
             descripcion: miProducto.nombre,
-            valor_referencial_unitario: Number(
-              producto.valorReferencialUnitario
-            ).toFixed(2),
+            valor_referencial_unitario: Number(producto.precioUnitario).toFixed(
+              2
+            ),
             valor_venta: valorVenta.toFixed(2),
             igv: igv.toFixed(2),
           };
