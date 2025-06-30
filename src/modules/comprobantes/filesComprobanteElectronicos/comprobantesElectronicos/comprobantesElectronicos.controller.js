@@ -807,7 +807,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
         await PagosComprobantesElectronicos.create(
           {
             comprobanteElectronicoId: comprobanteElectronico.id,
-            metodoPagoId: metodoPago.id,
+            metodoPago: metodoPago,
             operacion: pago.operacion,
             monto: pago.monto,
             fecha: pago.fecha,
