@@ -77,6 +77,7 @@ export const findAllKardex = catchAsync(async (req, res, next) => {
                 'numeroSerie',
                 'fechaEmision',
                 'tipoComprobante',
+                'tipo_factura',
               ],
               where: { estado: 'ACEPTADA' },
               required: false,

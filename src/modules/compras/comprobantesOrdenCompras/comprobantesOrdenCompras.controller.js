@@ -225,19 +225,19 @@ export const update = catchAsync(async (req, res) => {
     fechaVencimiento,
     moneda,
     tipoOrdenCompra,
-    formaPago,
     tipoCambio,
     observacion,
-    arrayPagos,
-    productos,
+    serie,
+    // arrayPagos,
+    // productos,
   } = req.body;
 
-  const totalPrecioProductos = productos.reduce(
-    (sum, producto) => sum + Number(producto.total),
-    0
-  );
+  // const totalPrecioProductos = productos.reduce(
+  //   (sum, producto) => sum + Number(producto.total),
+  //   0
+  // );
 
-  const pagado = arrayPagos.reduce((sum, pago) => sum + Number(pago.monto), 0);
+  // const pagado = arrayPagos.reduce((sum, pago) => sum + Number(pago.monto), 0);
 
   const transaction = await db.transaction();
 
@@ -252,58 +252,62 @@ export const update = catchAsync(async (req, res) => {
         fechaVencimiento,
         moneda,
         tipoOrdenCompra,
-        formaPago,
         tipoCambio,
         observacion,
-        saldoInicial: totalPrecioProductos,
-        saldo: totalPrecioProductos - pagado,
-        estadoPago:
-          Math.abs(totalPrecioProductos - pagado) < 0.01
-            ? 'CANCELADO'
-            : 'PENDIENTE',
+        serie,
+        // saldoInicial: totalPrecioProductos,
+        // saldo: totalPrecioProductos - pagado,
+        // estadoPago:
+        //   Math.abs(totalPrecioProductos - pagado) < 0.01
+        //     ? 'CANCELADO'
+        //     : 'PENDIENTE',
       },
       { transaction }
     );
 
-    await PagosOrdenCompras.destroy({
-      where: { cotizacionId: cotizacion.id },
-      transaction,
-    });
-    await ProductosOrdenCompras.destroy({
-      where: { cotizacionId: cotizacion.id },
-      transaction,
-    });
+    // await PagosOrdenCompras.destroy({
+    //   where: { cotizacionId: cotizacion.id },
+    //   transaction,
+    // });
+    // await ProductosOrdenCompras.destroy({
+    //   where: { cotizacionId: cotizacion.id },
+    //   transaction,
+    // });
 
-    for (const pago of arrayPagos) {
-      const metodoPago = await MetodosPago.findOne({
-        Where: { id: pago.metodoPago },
-      });
+    // for (const pago of arrayPagos) {
+    //   const metodoPago = await MetodosPago.findOne({
+    //     Where: { id: pago.metodoPago },
+    //   });
 
-      await PagosOrdenCompras.create(
-        {
-          ordenCompraId: ordenCompra.id,
-          metodoPago: metodoPago,
-          operacion: pago.operacion,
-          monto: pago.monto,
-          fecha: pago.fecha,
-        },
-        { transaction }
-      );
-    }
+    //   const banco = await CuentasBancarias.findOne({
+    //     Where: { id: pago.banco },
+    //   });
+    //   await PagosOrdenCompras.create(
+    //     {
+    //       ordenCompraId: ordenCompra.id,
+    //       metodoPago: metodoPago,
+    //       banco: banco,
+    //       operacion: pago.operacion,
+    //       monto: pago.monto,
+    //       fecha: pago.fecha,
+    //     },
+    //     { transaction }
+    //   );
+    // }
 
-    for (const producto of productos) {
-      await ProductosOrdenCompras.create(
-        {
-          ordenCompraId: ordenCompra.id,
-          productoId: producto.productoId,
-          cantidad: producto.cantidad,
-          precioUnitario: producto.precioUnitario,
-          total: producto.total,
-          stock: producto.cantidad,
-        },
-        { transaction }
-      );
-    }
+    // for (const producto of productos) {
+    //   await ProductosOrdenCompras.create(
+    //     {
+    //       ordenCompraId: ordenCompra.id,
+    //       productoId: producto.productoId,
+    //       cantidad: producto.cantidad,
+    //       precioUnitario: producto.precioUnitario,
+    //       total: producto.total,
+    //       stock: producto.cantidad,
+    //     },
+    //     { transaction }
+    //   );
+    // }
 
     // Confirmar la transacción
     await transaction.commit();
