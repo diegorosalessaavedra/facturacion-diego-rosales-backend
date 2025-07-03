@@ -582,7 +582,6 @@ export const create = catchAsync(async (req, res, next) => {
 });
 
 export const createCotizacion = catchAsync(async (req, res, next) => {
-  // 1. VALIDACIÓN Y DESTRUCTRING DE LA PETICIÓN
   validateCreateRequest(req.body);
   const { cotizacion } = req;
 
@@ -606,6 +605,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
     observacion,
   } = req.body;
 
+  // Validaciones iniciales
   if (cotizacion.comprobanteElectronicoId) {
     throw new AppError(
       'Esta cotización ya tiene un comprobante electrónico',
@@ -620,6 +620,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
     );
   }
 
+  // Obtener datos necesarios
   const cliente = await Clientes.findOne({
     where: { id: clienteId },
     rejectOnEmpty: true,
@@ -631,13 +632,13 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
   let dataParaApiExterna = {};
 
   if (tipo_factura === 'GRATUITA') {
-    // ---- LÓGICA PARA FACTURA GRATUITA ----
     if (arrayPagos && arrayPagos.length > 0) {
       throw new AppError(
         'Las facturas gratuitas no deben tener pagos asociados.',
         400
       );
     }
+
     const { totalOperGratuitas, totalIgvGratuitas } = productos.reduce(
       (acc, prod) => {
         const cantidad = Number(prod.cantidad);
@@ -655,6 +656,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
       },
       { totalOperGratuitas: 0, totalIgvGratuitas: 0 }
     );
+
     dataParaGuardarDB = {
       total_valor_venta: 0,
       total_igv: 0,
@@ -665,6 +667,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
         'TRANSFERENCIA GRATUITA DE UN BIEN Y/O SERVICIO PRESTADO GRATUITAMENTE',
       monto_pendiente: 0,
     };
+
     dataParaApiExterna = {
       tipo_factura: 'GRATUITA',
       tipo_operacion: '0101',
@@ -701,6 +704,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
     // ---- LÓGICA PARA FACTURA DE VENTA ----
     const { totalPrecioProductos, totalValorVenta, totalIgv } =
       calculateTotals(productos);
+
     dataParaGuardarDB = {
       total_valor_venta: totalValorVenta,
       total_igv: totalIgv,
@@ -708,6 +712,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
       legend: numeroALetras(totalPrecioProductos),
       monto_pendiente,
     };
+
     dataParaApiExterna = {
       tipo_factura: 'VENTA',
       ...(tipoOperacion === 'VENTA INTERNA'
@@ -737,14 +742,15 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
           const precioUnitarioSinIGV = Number(producto.precioUnitario) / 1.18;
           const valorVenta = precioUnitarioSinIGV * Number(producto.cantidad);
           const igv = valorVenta * 0.18;
+
           return {
             codigo: miProducto.codigoSunat,
             cantidad: producto.cantidad,
             unidad: miProducto.codUnidad,
-            precio_unitario: precioUnitarioSinIGV.toFixed(2),
+            precio_unitario: precioUnitarioSinIGV,
             descripcion: miProducto.nombre,
-            valor_venta: valorVenta.toFixed(2),
-            igv: igv.toFixed(2),
+            valor_venta: valorVenta,
+            igv: igv,
           };
         })
       ),
@@ -753,9 +759,12 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
 
   // 3. TRANSACCIÓN Y CREACIÓN DE REGISTROS EN LA BASE DE DATOS
   let comprobanteElectronico;
+  let estadoFinal = 'PENDIENTE';
+  let observacionesFinal = null;
   const transaction = await db.transaction();
 
   try {
+    // Crear el comprobante electrónico
     comprobanteElectronico = await ComprobantesElectronicos.create(
       {
         clienteId,
@@ -775,6 +784,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
       { transaction }
     );
 
+    // Crear registro de detracción si aplica
     if (
       tipo_factura === 'VENTA' &&
       tipoOperacion === 'OPERACIÓN SUJETA A DETRACCIÓN'
@@ -791,23 +801,25 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
         { transaction }
       );
     }
-    await cotizacion.update(
-      { comprobanteElectronicoId: comprobanteElectronico.id },
-      { transaction }
-    );
 
-    if (tipo_factura === 'VENTA') {
+    // Actualizar cotización con el ID del comprobante
+
+    // Crear pagos si es factura de venta
+    if (tipo_factura === 'VENTA' && arrayPagos?.length > 0) {
       for (const pago of arrayPagos) {
         const metodoPago = await MetodosPago.findOne({
           where: { id: pago.metodoPago },
           transaction,
         });
-        if (!metodoPago)
+
+        if (!metodoPago) {
           throw new AppError('Método de pago no encontrado', 404);
+        }
+
         await PagosComprobantesElectronicos.create(
           {
             comprobanteElectronicoId: comprobanteElectronico.id,
-            metodoPago: metodoPago,
+            metodoPago,
             operacion: pago.operacion,
             monto: pago.monto,
             fecha: pago.fecha,
@@ -817,6 +829,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
       }
     }
 
+    // Crear productos del comprobante
     for (const producto of productos) {
       await ProductosComprobanteElectronico.create(
         {
@@ -862,116 +875,140 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
               'Content-Type': 'application/json',
               Accept: 'application/json',
             },
+            timeout: 30000, // 30 segundos timeout
           }
         );
 
-        if (response.data?.cdr?.estado !== 'ACEPTADA') {
-          throw new AppError(
-            `La SUNAT rechazó el comprobante: ${
-              response.data?.cdr?.description || 'Sin descripción.'
-            }`,
-            400
+        if (response.data?.cdr?.estado === 'ACEPTADA') {
+          const digestValue = extractDigestValue(response.data.xml);
+          const qrContent = generateQRContent({
+            emisorRuc: process.env.COMPANY_RUC,
+            tipoComprobante: dataCompletaParaApi.tipo_documento,
+            serie: dataCompletaParaApi.serie,
+            correlativo: dataCompletaParaApi.correlativo,
+            igv: dataParaGuardarDB.total_igv,
+            total: dataParaGuardarDB.total_venta,
+            fecha_emision: fecEmision,
+            tipoDocCliente: dataCompletaParaApi.cliente_tipo_doc,
+            numeroDocCliente: cliente.numeroDoc,
+            digestValue,
+          });
+
+          // Actualizar stock solo si la factura es aceptada
+          await updateProductStock(productos, transaction);
+
+          // Actualizar estado del comprobante
+          estadoFinal = 'ACEPTADA';
+          await comprobanteElectronico.update(
+            {
+              estado: 'ACEPTADA',
+              urlXml: response.data.files?.xml,
+              cdr: response.data.files?.cdr,
+              digestValue,
+              qrContent,
+            },
+            { transaction }
+          );
+
+          await cotizacion.update(
+            { comprobanteElectronicoId: comprobanteElectronico.id },
+            { transaction }
+          );
+        } else {
+          // Respuesta del API pero sin estado ACEPTADA
+          estadoFinal = 'RECHAZADA';
+          observacionesFinal = `Error en servicio externo: ${
+            response.data?.mensaje || 'Error desconocido'
+          }`;
+
+          await comprobanteElectronico.update(
+            {
+              estado: 'RECHAZADA',
+              observaciones: observacionesFinal,
+            },
+            { transaction }
           );
         }
-
-        const digestValue = extractDigestValue(response.data.xml);
-        const qrContent = generateQRContent({
-          emisorRuc: process.env.COMPANY_RUC,
-          tipoComprobante: dataCompletaParaApi.tipo_documento,
-          serie: dataCompletaParaApi.serie,
-          correlativo: dataCompletaParaApi.correlativo,
-          igv: dataParaGuardarDB.total_igv,
-          total: dataParaGuardarDB.total_venta,
-          fecha_emision: fecEmision,
-          tipoDocCliente: dataCompletaParaApi.cliente_tipo_doc,
-          numeroDocCliente: cliente.numeroDoc,
-          digestValue,
-        });
-
-        // Actualizar stock solo si la factura es aceptada
-        for (const producto of productos) {
-          const miProducto = await MisProductos.findOne({
-            where: { id: producto.productoId },
-            lock: true,
-            transaction,
-          });
-          if (miProducto && miProducto.conStock) {
-            await miProducto.update(
-              {
-                stock: Number(miProducto.stock) - Number(producto.cantidad),
-              },
-              { transaction }
-            );
-          }
-        }
-
-        await comprobanteElectronico.update(
-          {
-            estado: 'ACEPTADA',
-            urlXml: response.data.files?.xml,
-            cdr: response.data.files?.cdr,
-            digestValue,
-            qrContent,
-          },
-          { transaction }
-        );
       } catch (error) {
         console.error('Error en el servicio de comprobantes:', {
           message: error.message,
           response: error.response?.data,
           stack: error.stack,
+          comprobanteId: comprobanteElectronico.id,
         });
-        await comprobanteElectronico.update(
-          {
-            estado: 'RECHAZADA',
-            observaciones: `Error en servicio externo: ${
-              error.response?.data?.error?.message ||
-              error.message ||
-              'Error desconocido'
-            }`,
-          },
-          { transaction }
+
+        const errorMessage = getErrorMessage(error);
+        const shouldKeepComprobante = shouldCreateAsRejected(
+          error,
+          errorMessage
         );
-        await cotizacion.update(
-          { comprobanteElectronicoId: null },
-          { transaction }
-        );
-        throw new AppError(
-          `Fallo al emitir comprobante: ${
-            error.response?.data?.error?.message || error.message
-          }`,
-          500
-        );
-      }
-    } else {
-      // Caso sin URL (facturación no electrónica o modo de prueba)
-      for (const producto of productos) {
-        const miProducto = await MisProductos.findOne({
-          where: { id: producto.productoId },
-          lock: true,
-          transaction,
-        });
-        if (miProducto && miProducto.conStock) {
-          await miProducto.update(
+
+        if (shouldKeepComprobante) {
+          // Para errores específicos, mantener el comprobante como rechazado
+          estadoFinal = 'RECHAZADA';
+          observacionesFinal = `Error en servicio externo: ${errorMessage}`;
+
+          await comprobanteElectronico.update(
             {
-              stock: Number(miProducto.stock) - Number(producto.cantidad),
+              estado: 'RECHAZADA',
+              observaciones: observacionesFinal,
             },
             { transaction }
           );
+
+          console.log(
+            'Comprobante creado como RECHAZADA debido a error específico:',
+            errorMessage
+          );
+        } else {
+          // Para otros errores, eliminar la relación y hacer rollback
+          await comprobanteElectronico.update(
+            {
+              estado: 'RECHAZADA',
+              observaciones: `Error en servicio externo: ${errorMessage}`,
+            },
+            { transaction }
+          );
+
+          await cotizacion.update(
+            { comprobanteElectronicoId: null },
+            { transaction }
+          );
+
+          throw new AppError(
+            `Fallo al emitir comprobante: ${errorMessage}`,
+            500
+          );
         }
       }
+    } else {
+      // Caso sin URL (facturación no electrónica o modo de prueba)
+      await updateProductStock(productos, transaction);
+      estadoFinal = 'ACEPTADA';
       await comprobanteElectronico.update(
         { estado: 'ACEPTADA' },
         { transaction }
       );
     }
 
+    // Commit de la transacción
     await transaction.commit();
 
-    res.status(201).json({
-      status: 'success',
-      message: 'Comprobante electrónico creado exitosamente',
-      comprobanteElectronico,
+    // Respuesta basada en el estado final
+    const statusCode = estadoFinal === 'ACEPTADA' ? 201 : 200;
+    const message =
+      estadoFinal === 'ACEPTADA'
+        ? 'Comprobante electrónico creado y aceptado exitosamente'
+        : 'Comprobante electrónico creado pero fue rechazado por el servicio externo';
+
+    res.status(statusCode).json({
+      status: estadoFinal === 'ACEPTADA' ? 'success' : 'warning',
+      message,
+      comprobanteElectronico: {
+        ...comprobanteElectronico.toJSON(),
+        estado: estadoFinal,
+        observaciones: observacionesFinal,
+      },
     });
   } catch (error) {
     await transaction.rollback();
@@ -979,6 +1016,7 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
       error: error.message,
       stack: error.stack,
       body: req.body,
+      comprobanteId: comprobanteElectronico?.id,
     });
     next(error);
   }
