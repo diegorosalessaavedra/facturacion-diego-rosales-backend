@@ -1,11 +1,28 @@
-import { Op, fn, col, literal } from 'sequelize';
+import { Op } from 'sequelize';
 import { AppError } from '../../../utils/AppError.js';
 import { catchAsync } from '../../../utils/catchAsync.js';
 import { Clientes } from './clientes.model.js';
 import { db } from '../../../db/db.config.js';
 
 export const findAll = catchAsync(async (req, res, next) => {
-  const clientes = await Clientes.findAll();
+  const { numeroDoc, nombreComercial } = req.query;
+
+  let whereCliente = {};
+
+  if (numeroDoc && numeroDoc.length > 1) {
+    whereCliente.numeroDoc = { [Op.iLike]: `%${numeroDoc}%` };
+  }
+
+  if (nombreComercial && nombreComercial.length > 1) {
+    const nombreBuscado = `%${nombreComercial}%`;
+
+    whereCliente[Op.or] = [
+      { nombreApellidos: { [Op.iLike]: nombreBuscado } },
+      { nombreComercial: { [Op.iLike]: nombreBuscado } },
+    ];
+  }
+
+  const clientes = await Clientes.findAll({ where: whereCliente });
 
   return res.status(200).json({
     status: 'Success',
