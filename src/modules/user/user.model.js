@@ -37,7 +37,8 @@ const User = db.define('users', {
       'ADMINISTRADOR',
       'VENDEDOR',
       'COMPRADOR',
-      'COMPRADOR/VENDEDOR'
+      'COMPRADOR/VENDEDOR',
+      'RRHH'
     ),
     allowNull: false,
   },
