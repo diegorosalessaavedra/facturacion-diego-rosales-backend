@@ -1022,6 +1022,47 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
   }
 });
 
+async function updateProductStock(productos, transaction) {
+  for (const producto of productos) {
+    const miProducto = await MisProductos.findOne({
+      where: { id: producto.productoId },
+      lock: true,
+      transaction,
+    });
+
+    if (miProducto && miProducto.conStock) {
+      const nuevoStock = Number(miProducto.stock) - Number(producto.cantidad);
+      await miProducto.update({ stock: nuevoStock }, { transaction });
+    }
+  }
+}
+
+function getErrorMessage(error) {
+  return (
+    error.response?.data?.error?.message ||
+    error.response?.data?.mensaje ||
+    error.message ||
+    'Error desconocido'
+  );
+}
+
+function shouldCreateAsRejected(error, errorMessage) {
+  // Lista de errores que deben crear el comprobante como rechazado
+  const specificErrors = [
+    'registrado previamente',
+    'El comprobante fue registrado previamente',
+    '1033',
+    '1032',
+    'registrado anteriormente',
+    'duplicado',
+    'ya existe',
+  ];
+
+  return specificErrors.some((errorPattern) =>
+    errorMessage.toLowerCase().includes(errorPattern.toLowerCase())
+  );
+}
+
 export const update = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const updateData = req.body;

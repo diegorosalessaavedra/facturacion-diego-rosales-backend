@@ -78,22 +78,15 @@ const Colaboradores = db.define('colaboradores', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-  // tipo_contrato_colaborador: {
-  //   type: DataTypes.ENUM(
-  //     'Jornada completa',
-  //     'Jornada parcial',
-  //     'Autónomo',
-  //     'Profesional independiente',
-  //     'Contrato temporal',
-  //     'Contrato de prácticas',
-  //     'Temporal'
-  //   ),
-  //   allowNull: false,
-  //   defaultValue: 'Jornada completa',
-  // },
 
   cv_colaborador: {
     type: DataTypes.TEXT,
+    allowNull: false,
+  },
+
+  estado: {
+    type: DataTypes.ENUM('ACTIVO', 'INACTIVO'),
+    defaultValue: 'ACTIVO',
     allowNull: false,
   },
 });
