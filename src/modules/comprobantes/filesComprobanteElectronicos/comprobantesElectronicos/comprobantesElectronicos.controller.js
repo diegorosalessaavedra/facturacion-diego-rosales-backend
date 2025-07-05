@@ -982,11 +982,15 @@ export const createCotizacion = catchAsync(async (req, res, next) => {
         }
       }
     } else {
-      // Caso sin URL (facturación no electrónica o modo de prueba)
       await updateProductStock(productos, transaction);
       estadoFinal = 'ACEPTADA';
       await comprobanteElectronico.update(
         { estado: 'ACEPTADA' },
+        { transaction }
+      );
+
+      await cotizacion.update(
+        { comprobanteElectronicoId: comprobanteElectronico.id },
         { transaction }
       );
     }
