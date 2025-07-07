@@ -1,4 +1,3 @@
-import { DATE } from 'sequelize';
 import { db } from '../../../../db/db.config.js';
 import { AppError } from '../../../../utils/AppError.js';
 import { catchAsync } from '../../../../utils/catchAsync.js';
@@ -134,8 +133,6 @@ export const create = catchAsync(async (req, res, next) => {
 export const update = catchAsync(async (req, res) => {
   const { vacionesSolicitada } = req;
   const { pendiente_autorizacion } = req.body;
-
-  console.log(pendiente_autorizacion);
 
   // Actualizar solicitud de vacaciones
 

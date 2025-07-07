@@ -51,3 +51,44 @@ export const sendConfirmationEmail = async (findVacacionesSolicitada) => {
     console.error('Error al enviar el correo electrónico:', error);
   }
 };
+
+export const sendEmailDescansoMedico = async (findVacacionesSolicitada) => {
+  try {
+    const {
+      colaborador,
+      periodo_inicio,
+      periodo_final,
+      titulo_descanzo_medico,
+    } = findVacacionesSolicitada;
+
+    const emailBody = `
+      <div style="max-width: 600px; margin: 0 auto; padding: 24px; font-family: Arial, sans-serif; color: #333; background-color: #f8f8f8; border-radius: 8px;">
+        <h2 style="color: #2e86de;">Solicitud de descanso médico</h2>
+        <p><strong>Colaborador:</strong> ${colaborador.nombre_colaborador} ${colaborador.apellidos_colaborador}</p>
+        <p><strong>Diagnostico:</strong> ${titulo_descanzo_medico}</p>
+        <p><strong>Fecha de inicio:</strong> ${periodo_inicio}</p>
+        <p><strong>Fecha final:</strong> ${periodo_final}</p>
+        <p>
+          <a href="${LINK_FRONT}/rrhh/solicitudes-vacaciones" style="display: inline-block; padding: 10px 20px; background-color: #2e86de; color: #fff; text-decoration: none; border-radius: 5px;">
+            Ver solicitudes
+          </a>
+        </p>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: EMAIL,
+      to: EMAIL_TO,
+      subject: `Nueva solicitud de vacaciones de ${colaborador.nombre_colaborador} ${colaborador.apellidos_colaborador}`,
+      text: `Solicitud de vacaciones:\nColaborador: ${colaborador.nombre_colaborador} ${colaborador.apellidos_colaborador}\nInicio: ${periodo_inicio}\nFin: ${periodo_final}\nVer más: ${LINK_FRONT}/rrhh/solicitudes-descansos-medico`,
+      html: emailBody,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(
+      `Correo electrónico enviado a: ${EMAIL_TO}, ID: ${info.messageId}`
+    );
+  } catch (error) {
+    console.error('Error al enviar el correo electrónico:', error);
+  }
+};

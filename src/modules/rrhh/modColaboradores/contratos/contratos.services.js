@@ -25,10 +25,6 @@ export const uploadFileToLaravel = async (file) => {
   }
 };
 
-/**
- * Elimina un archivo del servicio de Laravel.
- * @param {string} filename - El nombre del archivo a eliminar.
- */
 export const deleteFileFromLaravel = async (filename) => {
   if (!filename) return;
 

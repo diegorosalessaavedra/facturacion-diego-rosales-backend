@@ -73,6 +73,24 @@ const Colaboradores = db.define('colaboradores', {
     type: DataTypes.STRING,
     allowNull: false,
   },
+
+  // contacto de emergencia 2
+  nombre_contacto_emergencia2: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  apellidos_contacto_emergencia2: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  telefono_contacto_emergencia2: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  vinculo_contacto_emergencia2: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   // cargo laboral
   cargo_laboral_id: {
     type: DataTypes.INTEGER,

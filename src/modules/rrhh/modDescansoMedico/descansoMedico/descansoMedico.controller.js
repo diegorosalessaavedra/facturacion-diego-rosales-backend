@@ -3,49 +3,57 @@ import { db } from '../../../../db/db.config.js';
 import { AppError } from '../../../../utils/AppError.js';
 import { catchAsync } from '../../../../utils/catchAsync.js';
 import { Colaboradores } from '../../modColaboradores/colaboradores/colaboradores.model.js';
-import { DescanzoMedico } from './descanzoMedico.model.js';
+import { DescansoMedico } from './descansoMedico.model.js';
 import axios from 'axios';
+import { sendEmailDescansoMedico } from '../../../../utils/nodemailer.js';
 
 export const findAllColaboradores = catchAsync(async (req, res, next) => {
-  const descanzoMedicos = await Colaboradores.findAll();
+  const descansoMedicos = await Colaboradores.findAll();
 
   return res.status(200).json({
     status: 'Success',
-    results: descanzoMedicos.length,
-    descanzoMedicos,
+    results: descansoMedicos.length,
+    descansoMedicos,
   });
 });
 
 export const findAllColaborador = catchAsync(async (req, res, next) => {
   const { id: colaborador_id } = req.params; // Renombrar id a colaborador_id para claridad
 
-  const descanzosMedicos = await DescanzoMedico.findAll({
+  const descansoMedicos = await DescansoMedico.findAll({
     where: { colaborador_id },
   });
 
   return res.status(200).json({
     status: 'Success',
-    results: descanzosMedicos.length,
-    descanzosMedicos,
+    results: descansoMedicos.length,
+    descansoMedicos,
   });
 });
 
 export const findAll = catchAsync(async (req, res, next) => {
-  const descanzoMedicos = await DescanzoMedico.findAll();
+  const descansosMedicos = await DescansoMedico.findAll({
+    include: [
+      {
+        model: Colaboradores,
+        as: 'colaborador',
+      },
+    ],
+  });
 
   return res.status(200).json({
     status: 'Success',
-    results: descanzoMedicos.length,
-    descanzoMedicos,
+    results: descansosMedicos.length,
+    descansosMedicos,
   });
 });
 
 export const findOne = catchAsync(async (req, res, next) => {
-  const { cargoLaboral } = req;
+  const { descansoMedico } = req;
 
   return res.status(200).json({
     status: 'Success',
-    cargoLaboral,
+    descansoMedico,
   });
 });
 
@@ -53,7 +61,7 @@ export const create = catchAsync(async (req, res, next) => {
   const transaction = await db.transaction();
 
   const { id: colaborador_id } = req.params; // Renombrar id a colaborador_id para claridad
-  const { periodo_inicio, periodo_final, titulo_descanzo_medico } = req.body;
+  const { periodo_inicio, periodo_final, titulo_descanso_medico } = req.body;
   const file = req.file;
 
   let uploadedFilename = null; // Declarar la variable para almacenar el nombre del archivo subido a Laravel
@@ -77,25 +85,33 @@ export const create = catchAsync(async (req, res, next) => {
       },
     });
 
-    console.log(uploadResponse.data);
-
     uploadedFilename = uploadResponse.data.filename;
 
-    const descanzoMedico = await DescanzoMedico.create(
+    const fecha_hoy = new Date().toLocaleDateString('es-PE');
+
+    const descansoMedico = await DescansoMedico.create(
       {
         colaborador_id: colaborador_id, // Usar el id del colaborador de los params
         periodo_inicio,
         periodo_final,
-        titulo_descanzo_medico,
-        archivo_descanzo_medico: uploadedFilename, // Asegúrate de que tu modelo DescanzoMedico tenga este campo
+        titulo_descanso_medico,
+        fecha_solicitud: fecha_hoy,
+        archivo_descanso_medico: uploadedFilename, // Asegúrate de que tu modelo descansoMedico tenga este campo
       },
       { transaction } // Asociar la creación a la transacción
     );
     await transaction.commit();
+
+    const finddescansoMedicoSolicitada = await DescansoMedico.findOne({
+      where: { id: descansoMedico.id },
+      include: [{ model: Colaboradores, as: 'colaborador' }],
+    });
+
+    sendEmailDescansoMedico(finddescansoMedicoSolicitada);
     res.status(201).json({
       status: 'success',
       message: 'El descanzo médico se registró correctamente!',
-      descanzoMedico,
+      descansoMedico,
     });
   } catch (error) {
     console.error(
@@ -138,29 +154,42 @@ export const create = catchAsync(async (req, res, next) => {
 });
 
 export const update = catchAsync(async (req, res) => {
-  const { descanzoMedico } = req;
-  const { periodo_inicio, periodo_final, titulo_descanzo_medico } = req.body;
+  const { descansoMedico } = req;
+  const { pendiente_autorizacion } = req.body;
 
-  await descanzoMedico.update({
-    periodo_inicio,
-    periodo_final,
-    titulo_descanzo_medico,
+  await descansoMedico.update({
+    pendiente_autorizacion,
   });
 
   return res.status(200).json({
     status: 'success',
-    message: 'the descanzoMedico information has been updated',
-    descanzoMedico,
+    message: 'the descansoMedico information has been updated',
+    descansoMedico,
+  });
+});
+
+export const updateAutorizacion = catchAsync(async (req, res) => {
+  const { descansoMedico } = req;
+  const { pendiente_autorizacion } = req.body;
+
+  await descansoMedico.update({
+    pendiente_autorizacion,
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'the descansoMedico information has been updated',
+    descansoMedico,
   });
 });
 
 export const deleteElement = catchAsync(async (req, res, next) => {
-  const { descanzoMedico } = req;
+  const { descansoMedico } = req;
 
   const transaction = await db.transaction(); // Iniciar una transacción para la eliminación local
 
   try {
-    const filenameToDelete = descanzoMedico.ruta_archivo; // Usar el campo correcto del modelo
+    const filenameToDelete = descansoMedico.archivo_descanso_medico; // Usar el campo correcto del modelo
 
     if (filenameToDelete) {
       const deleteUrl = `${process.env.LARAVEL_URL}/api/descanzo-medico`; // Ajusta esta URL si es diferente
@@ -185,14 +214,14 @@ export const deleteElement = catchAsync(async (req, res, next) => {
       // Si no hay archivo asociado, simplemente continuamos con la eliminación local
     }
 
-    await descanzoMedico.destroy({ transaction }); // Eliminar el registro usando el objeto del modelo y la transacción
+    await descansoMedico.destroy({ transaction }); // Eliminar el registro usando el objeto del modelo y la transacción
 
     await transaction.commit();
 
     // --- Paso 4: Enviar respuesta de éxito ---
     return res.status(200).json({
       status: 'success',
-      message: `El descanzo médico con id: ${descanzoMedico.id} ha sido eliminado`,
+      message: `El descanzo médico con id: ${descansoMedico.id} ha sido eliminado`,
     });
   } catch (error) {
     console.error(

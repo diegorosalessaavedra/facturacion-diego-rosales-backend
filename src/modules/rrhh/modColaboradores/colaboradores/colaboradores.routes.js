@@ -10,22 +10,45 @@ const router = express.Router();
 
 router.use(authMiddleware.protect);
 
+// Obtener todos los colaboradores
 router.get('/', colaboradoresController.findAll);
+router.get('/inactivos', colaboradoresController.findAllInactivos);
+router.get(
+  '/activar/:id',
+  colaboradoresMiddleware.validExistColaborador,
+  colaboradoresController.activarColaborador
+);
+
+// Crear nuevo colaborador con archivos
 router.post(
   '/',
   upload.fields([
     { name: 'foto_colaborador', maxCount: 1 },
     { name: 'cv_colaborador', maxCount: 1 },
-    { name: 'archivos_complementarios', maxCount: 10 }, // Ajusta maxCount según necesites
+    { name: 'archivos_complementarios', maxCount: 10 },
   ]),
   colaboradoresController.create
 );
 
+// Obtener uno y actualizar por ID
 router
   .route('/:id')
   .get(
     colaboradoresMiddleware.validExistColaborador,
-    colaboradoresController.create
+    colaboradoresController.findOne
+  )
+  .patch(
+    upload.fields([
+      { name: 'foto_colaborador', maxCount: 1 },
+      { name: 'cv_colaborador', maxCount: 1 },
+      { name: 'archivos_complementarios', maxCount: 10 },
+    ]),
+    colaboradoresMiddleware.validExistColaborador,
+    colaboradoresController.update
+  )
+  .delete(
+    colaboradoresMiddleware.validExistColaborador,
+    colaboradoresController.deleteElement
   );
 
 const colaboradoresRouter = router;

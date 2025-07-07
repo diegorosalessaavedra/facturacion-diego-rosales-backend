@@ -36,11 +36,11 @@ import { origenRouter } from './modules/clientesProveedores/origen/origen.routes
 import { colaboradoresRouter } from './modules/rrhh/modColaboradores/colaboradores/colaboradores.routes.js';
 import { cargoLaboralRouter } from './modules/rrhh/modColaboradores/cargoLaboral/cargoLaboral.routes.js';
 import { docComplemColaboradoresRouter } from './modules/rrhh/modColaboradores/docCompleColaboradores/docCompleColaboradores.routes.js';
-import { descanzoMedicoRouter } from './modules/rrhh/modDescanzoMedico/descanzoMedico/descanzoMedico.routes.js';
 import { vacacionesRouter } from './modules/rrhh/modVacaciones/vacaciones/vacaciones.routes.js';
 import { vacaionesSolicitadasRouter } from './modules/rrhh/modVacaciones/vacionesSolicitadas/vacionesSolicitadas.routes.js';
 import { contratosRouter } from './modules/rrhh/modColaboradores/contratos/contratos.routes.js';
 import { memosRouter } from './modules/rrhh/modColaboradores/memos/memos.routes.js';
+import { descansoMedicoRouter } from './modules/rrhh/modDescansoMedico/descansoMedico/descansoMedico.routes.js';
 
 const app = express();
 
@@ -133,7 +133,7 @@ app.use('/api/v1/rrhh/contratos', contratosRouter);
 app.use('/api/v1/rrhh/memos', memosRouter);
 
 // descanzo medico
-app.use('/api/v1/rrhh/descanzo-medico', descanzoMedicoRouter);
+app.use('/api/v1/rrhh/descanso-medico', descansoMedicoRouter);
 
 //vacaciones
 app.use('/api/v1/rrhh/vacaciones', vacacionesRouter);

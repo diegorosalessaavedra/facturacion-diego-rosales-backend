@@ -24,11 +24,11 @@ import { ProductoCotizaciones } from '../modules/ventas/productoCotizaciones/pro
 import { CargoLaboral } from '../modules/rrhh/modColaboradores/cargoLaboral/cargoLaboral.model.js';
 import { Colaboradores } from '../modules/rrhh/modColaboradores/colaboradores/colaboradores.model.js';
 import { DocCompleColaboradores } from '../modules/rrhh/modColaboradores/docCompleColaboradores/docCompleColaboradores.model.js';
-import { DescanzoMedico } from '../modules/rrhh/modDescanzoMedico/descanzoMedico/descanzoMedico.model.js';
 import { Vacaciones } from '../modules/rrhh/modVacaciones/vacaciones/vacaciones.model.js';
 import { VacionesSolicitadas } from '../modules/rrhh/modVacaciones/vacionesSolicitadas/vacionesSolicitadas.model.js';
 import { Contratos } from '../modules/rrhh/modColaboradores/contratos/contratos.model.js';
 import { Memos } from '../modules/rrhh/modColaboradores/memos/memos.model.js';
+import { DescansoMedico } from '../modules/rrhh/modDescansoMedico/descansoMedico/descansoMedico.model.js';
 
 const initModel = () => {
   Cotizaciones.belongsTo(User, { foreignKey: 'usuarioId', as: 'usario' });
@@ -266,12 +266,12 @@ const initModel = () => {
     as: 'colaborador',
   });
 
-  Colaboradores.hasMany(DescanzoMedico, {
+  Colaboradores.hasMany(DescansoMedico, {
     foreignKey: 'colaborador_id',
-    as: 'descanzos_medicos',
+    as: 'descansos_medicos',
   });
 
-  DescanzoMedico.belongsTo(Colaboradores, {
+  DescansoMedico.belongsTo(Colaboradores, {
     foreignKey: 'colaborador_id',
     as: 'colaborador',
   });

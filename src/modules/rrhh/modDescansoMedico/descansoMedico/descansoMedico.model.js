@@ -1,7 +1,7 @@
 import { DataTypes } from 'sequelize';
 import { db } from '../../../../db/db.config.js';
 
-const DescanzoMedico = db.define('descanzo_medico', {
+const DescansoMedico = db.define('descanso_medico', {
   id: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -12,7 +12,11 @@ const DescanzoMedico = db.define('descanzo_medico', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-  titulo_descanzo_medico: {
+  titulo_descanso_medico: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  fecha_solicitud: {
     type: DataTypes.STRING,
     allowNull: false,
   },
@@ -24,10 +28,15 @@ const DescanzoMedico = db.define('descanzo_medico', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  archivo_descanzo_medico: {
+  archivo_descanso_medico: {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  pendiente_autorizacion: {
+    type: DataTypes.ENUM('PENDIENTE', 'ACEPTADO', 'RECHAZADO'),
+    allowNull: false,
+    defaultValue: 'PENDIENTE',
+  },
 });
 
-export { DescanzoMedico };
+export { DescansoMedico };

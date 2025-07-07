@@ -1,30 +1,63 @@
-import axios from 'axios';
 import { catchAsync } from '../../../../utils/catchAsync.js';
 import { Colaboradores } from './colaboradores.model.js';
-import FormData from 'form-data';
 import { AppError } from '../../../../utils/AppError.js';
 import { db } from '../../../../db/db.config.js';
 import { CargoLaboral } from '../cargoLaboral/cargoLaboral.model.js';
 import { DocCompleColaboradores } from '../docCompleColaboradores/docCompleColaboradores.model.js';
 import { Contratos } from '../contratos/contratos.model.js';
 import { Memos } from '../memos/memos.model.js';
+import {
+  deleteFileColaborador,
+  uploadFileToColaborador,
+} from './colaboradores.services.js';
+import { Op } from 'sequelize';
 
 export const findAll = catchAsync(async (req, res, next) => {
   const colaboradores = await Colaboradores.findAll({
+    where: { estado: 'ACTIVO' },
     include: [
       { model: CargoLaboral, as: 'cargo_laboral' },
       { model: DocCompleColaboradores, as: 'documentos_complementarios' },
-      { model: Contratos, as: 'contratos' },
+      {
+        model: Contratos,
+        as: 'contratos',
+        separate: true, // Opcional: carga contratos aparte para poder ordenarlos bien
+        order: [['fecha_final', 'DESC']],
+      },
       { model: Memos, as: 'memos' },
     ],
   });
 
   return res.status(200).json({
-    status: 'Success',
+    status: 'success',
     results: colaboradores.length,
     colaboradores,
   });
 });
+
+export const findAllInactivos = catchAsync(async (req, res, next) => {
+  const colaboradores = await Colaboradores.findAll({
+    where: { estado: 'INACTIVO' },
+    include: [
+      { model: CargoLaboral, as: 'cargo_laboral' },
+      { model: DocCompleColaboradores, as: 'documentos_complementarios' },
+      {
+        model: Contratos,
+        as: 'contratos',
+        separate: true, // Opcional: carga contratos aparte para poder ordenarlos bien
+        order: [['fecha_final', 'DESC']],
+      },
+      { model: Memos, as: 'memos' },
+    ],
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    results: colaboradores.length,
+    colaboradores,
+  });
+});
+
 export const findOne = catchAsync(async (req, res, next) => {
   const { colaborador } = req;
 
@@ -37,6 +70,8 @@ export const findOne = catchAsync(async (req, res, next) => {
 export const create = catchAsync(async (req, res, next) => {
   // Iniciar una transacción de base de datos para asegurar la atomicidad
   const transaction = await db.transaction();
+  // Array para almacenar las rutas de todos los archivos subidos, para limpieza en caso de error
+  const uploadedFilePaths = [];
 
   try {
     // Extraer datos del cuerpo de la solicitud
@@ -56,124 +91,96 @@ export const create = catchAsync(async (req, res, next) => {
       telefono_contacto_emergencia,
       vinculo_contacto_emergencia,
       cargo_laboral_id,
-
-      archivos_complementarios_names,
+      nombre_contacto_emergencia2,
+      apellidos_contacto_emergencia2,
+      telefono_contacto_emergencia2,
+      vinculo_contacto_emergencia2,
+      archivos_complementarios_names, // Nombres proporcionados por el usuario para los archivos complementarios
     } = req.body;
 
-    const existDni = await Colaboradores.findOne({
-      where: { dni_colaborador },
-    });
+    // --- 1. Comprobaciones de existencia unificadas ---
+    const existenceChecks = [
+      {
+        field: 'dni_colaborador',
+        value: dni_colaborador,
+        message: 'El DNI ya se encuentra registrado.',
+      },
+      {
+        field: 'telefono_colaborador',
+        value: telefono_colaborador,
+        message: 'El número de teléfono ya se encuentra registrado.',
+      },
+      {
+        field: 'correo_colaborador',
+        value: correo_colaborador,
+        message: 'El correo ya se encuentra registrado.',
+      },
+      {
+        field: 'telefono_contacto_emergencia',
+        value: telefono_contacto_emergencia,
+        message:
+          'El teléfono del contacto de emergencia ya se encuentra registrado.',
+      },
+    ];
 
-    if (existDni) {
-      await transaction.rollback();
-      return next(new AppError('El dni ya se encuentra registrado', 400));
-    }
-
-    const existTeleFono = await Colaboradores.findOne({
-      where: { telefono_colaborador },
-    });
-
-    if (existTeleFono) {
-      await transaction.rollback();
-      return next(
-        new AppError('El numero de telefono ya se encuentra registrado', 400)
-      );
-    }
-    const existCorreo = await Colaboradores.findOne({
-      where: { correo_colaborador },
-    });
-
-    if (existCorreo) {
-      await transaction.rollback();
-      return next(new AppError('El correo ya se encuentra registrado', 400));
-    }
-
-    const existTelefonoEmergencia = await Colaboradores.findOne({
-      where: { telefono_contacto_emergencia },
-    });
-
-    if (existTelefonoEmergencia) {
-      await transaction.rollback();
-      return next(
-        new AppError(
-          'El telfono del contacto de emergencia  ya se encuentra registrado',
-          400
-        )
-      );
-    }
-
-    const fotoFile =
-      req.file ||
-      (req.files && req.files['foto_colaborador']
-        ? req.files['foto_colaborador'][0]
-        : null);
-
-    const cvFile =
-      req.file ||
-      (req.files && req.files['cv_colaborador']
-        ? req.files['cv_colaborador'][0]
-        : null);
-
-    // Acceder a los archivos complementarios desde req.files
-    // Si usas upload.fields, será req.files['archivos_complementarios']
-    const complementaryFiles =
-      req.files && req.files['archivos_complementarios']
-        ? req.files['archivos_complementarios']
-        : [];
-
-    // Validar si el archivo CV es obligatorio
-    if (!fotoFile) {
-      await transaction.rollback();
-      return next(new AppError('La Foto es obligatorio', 400));
-    }
-
-    if (!cvFile) {
-      await transaction.rollback();
-      return next(new AppError('El archivo CV es obligatorio', 400));
-    }
-
-    // Array para almacenar la información de los archivos complementarios subidos
-    const uploadedComplementaryFilesInfo = [];
-
-    // --- NUEVO: Procesar y subir archivos complementarios ---
-    for (let i = 0; i < complementaryFiles.length; i++) {
-      const file = complementaryFiles[i];
-      // Usar el nombre proporcionado por el usuario o el nombre original del archivo
-      const fileName = archivos_complementarios_names[i];
-
-      // Crear FormData para el archivo complementario actual
-      const compFormData = new FormData();
-      compFormData.append('file', file.buffer, file.originalname);
-
-      // URL del servicio de Laravel para subir archivos
-      const uploadUrl = `${process.env.LARAVEL_URL}/api/colaboradores`; // Considera una ruta específica para complementarios
-
-      try {
-        // Enviar el archivo complementario al servicio de Laravel
-        const response = await axios.post(uploadUrl, compFormData);
-        console.log(response);
-
-        // Guardar la información relevante (nombre ingresado por el usuario y ruta retornada por el servicio)
-        uploadedComplementaryFilesInfo.push({
-          nombre_archivo: fileName, // Nombre ingresado por el usuario
-          ruta_archivo: response.data.filename, // Ruta retornada por el servicio de Laravel
-        });
-      } catch (error) {
-        // Si falla la subida de un archivo complementario, hacer rollback y retornar error
-        console.error(
-          `Error uploading complementary file ${fileName}:`,
-          error.response.data
-        );
-        await transaction.rollback();
-        const message =
-          error.response?.data?.message ||
-          `Error al subir el archivo complementario ${fileName}. Inténtalo nuevamente.`;
-        return next(new AppError(message, 500));
+    for (const check of existenceChecks) {
+      const exists = await Colaboradores.findOne({
+        where: { [check.field]: check.value },
+        transaction, // Incluir en la transacción para consistencia
+      });
+      if (exists) {
+        // No hacer rollback aquí, lanzar error para que lo maneje el catch
+        throw new AppError(check.message, 400);
       }
     }
-    // --- FIN NUEVO ---
 
-    // Crear el registro del colaborador en la base de datos
+    // --- 2. Acceso a archivos subidos por Multer ---
+    // Asumiendo que Multer está configurado con upload.fields para 'foto_colaborador', 'cv_colaborador', 'archivos_complementarios'
+    const fotoFile = req.files?.['foto_colaborador']?.[0];
+    const cvFile = req.files?.['cv_colaborador']?.[0];
+    const complementaryFiles = req.files?.['archivos_complementarios'] || [];
+
+    // Validar si los archivos principales son obligatorios
+    if (!fotoFile) {
+      throw new AppError('La foto del colaborador es obligatoria.', 400);
+    }
+    if (!cvFile) {
+      throw new AppError('El archivo CV es obligatorio.', 400);
+    }
+
+    // --- 3. Subir archivos principales y almacenar sus rutas ---
+    let foto_colaborador_path = null;
+    let cv_colaborador_path = null;
+
+    try {
+      foto_colaborador_path = await uploadFileToColaborador(fotoFile);
+      uploadedFilePaths.push(foto_colaborador_path); // Añadir a la lista de archivos subidos
+    } catch (error) {
+      console.error(
+        'Error al subir la foto del colaborador:',
+        error.response?.data || error.message
+      );
+      throw new AppError(
+        'Error al subir la foto del colaborador. Inténtalo nuevamente.',
+        500
+      );
+    }
+
+    try {
+      cv_colaborador_path = await uploadFileToColaborador(cvFile);
+      uploadedFilePaths.push(cv_colaborador_path); // Añadir a la lista de archivos subidos
+    } catch (error) {
+      console.error(
+        'Error al subir el CV del colaborador:',
+        error.response?.data || error.message
+      );
+      throw new AppError(
+        'Error al subir el CV del colaborador. Inténtalo nuevamente.',
+        500
+      );
+    }
+
+    // --- 4. Crear el registro del colaborador en la base de datos ---
     const colaborador = await Colaboradores.create(
       {
         nombre_colaborador,
@@ -191,82 +198,50 @@ export const create = catchAsync(async (req, res, next) => {
         telefono_contacto_emergencia,
         vinculo_contacto_emergencia,
         cargo_laboral_id,
-        cv_colaborador: '...',
+        nombre_contacto_emergencia2,
+        apellidos_contacto_emergencia2,
+        telefono_contacto_emergencia2,
+        vinculo_contacto_emergencia2,
+        foto_colaborador: foto_colaborador_path, // Asignar la ruta directamente
+        cv_colaborador: cv_colaborador_path, // Asignar la ruta directamente
       },
       { transaction } // Asegurarse de que la creación esté dentro de la transacción
     );
 
-    let foto_colaborador_path;
+    // --- 5. Procesar y subir archivos complementarios en paralelo ---
+    const uploadComplementaryPromises = complementaryFiles.map(
+      async (file, i) => {
+        const fileName = archivos_complementarios_names[i] || file.originalname; // Usar nombre de usuario o original
+        try {
+          const filePath = await uploadFileToColaborador(file);
+          uploadedFilePaths.push(filePath); // Añadir a la lista de archivos subidos
+          return {
+            colaborador_id: colaborador.id,
+            nombre_doc_complementario: fileName,
+            link_doc_complementario: filePath,
+          };
+        } catch (error) {
+          console.error(
+            `Error al subir el archivo complementario ${fileName}:`,
+            error.response?.data || error.message
+          );
+          // Lanzar un error para que Promise.all lo capture y el catch principal lo maneje
+          throw new AppError(
+            `Error al subir el archivo complementario ${fileName}.`,
+            500
+          );
+        }
+      }
+    );
 
-    // --- Lógica existente para subir el archivo CV ---
-    try {
-      const fotoFormData = new FormData();
-      fotoFormData.append('file', fotoFile.buffer, fotoFile.originalname);
+    const archivosParaCrear = await Promise.all(uploadComplementaryPromises);
 
-      const uploadUrl = `${process.env.LARAVEL_URL}/api/colaboradores`; // Considera una ruta específica para CV
-
-      const response = await axios.post(uploadUrl, fotoFormData);
-
-      foto_colaborador_path = response.data.filename; // Obtener la ruta retornada por el servicio
-    } catch (error) {
-      console.error('Error uploading photo file:', error.response);
-      await transaction.rollback();
-      const message =
-        error.response?.data?.message ||
-        'Ocurrió un error al subir la foto. Inténtalo nuevamente.';
-      return next(new AppError(message, 500));
-    }
-
-    colaborador.foto_colaborador = foto_colaborador_path;
-    await colaborador.save({ transaction });
-
-    let cv_colaborador_path;
-
-    // --- Lógica existente para subir el archivo CV ---
-    try {
-      const cvFormData = new FormData();
-      cvFormData.append('file', cvFile.buffer, cvFile.originalname);
-
-      const uploadUrl = `${process.env.LARAVEL_URL}/api/colaboradores`; // Considera una ruta específica para CV
-
-      const response = await axios.post(uploadUrl, cvFormData);
-
-      cv_colaborador_path = response.data.filename; // Obtener la ruta retornada por el servicio
-    } catch (error) {
-      console.error(
-        'Error uploading CV file:',
-        error.response?.data || error.message
-      );
-      await transaction.rollback();
-      const message =
-        error.response?.data?.message ||
-        'Ocurrió un error al subir el archivo CV. Inténtalo nuevamente.';
-      return next(new AppError(message, 500));
-    }
-    // --- Fin lógica existente para subir el archivo CV ---
-
-    // Actualizar el registro del colaborador con la ruta del CV
-    colaborador.cv_colaborador = cv_colaborador_path;
-    await colaborador.save({ transaction });
-
-    // Guardar dentro de la transacción
-
-    // --- NUEVO: Guardar información de archivos complementarios en la base de datos ---
-    if (uploadedComplementaryFilesInfo.length > 0) {
-      const archivosParaCrear = uploadedComplementaryFilesInfo.map(
-        (fileInfo) => ({
-          colaborador_id: colaborador.id, // Asociar con el colaborador recién creado
-          nombre_doc_complementario: fileInfo.nombre_archivo,
-          link_doc_complementario: fileInfo.ruta_archivo,
-          // Añade otros campos si tu modelo DocCompleColaboradores los requiere
-        })
-      );
-      // Usar bulkCreate para insertar múltiples registros eficientemente
+    // --- 6. Guardar información de archivos complementarios en la DB ---
+    if (archivosParaCrear.length > 0) {
       await DocCompleColaboradores.bulkCreate(archivosParaCrear, {
         transaction,
       });
     }
-    // --- FIN NUEVO ---
 
     // Si todo fue exitoso, confirmar la transacción
     await transaction.commit();
@@ -274,17 +249,348 @@ export const create = catchAsync(async (req, res, next) => {
     // Enviar respuesta de éxito
     res.status(201).json({
       status: 'success',
-      message: 'El colaborador y sus archivos se registraron correctamente!',
+      message: 'El colaborador y sus archivos se registraron correctamente.',
       colaborador,
     });
   } catch (error) {
-    console.error('Error in create colaborador transaction:', error);
-    await transaction.rollback();
-    return next(
-      new AppError(
-        'Ocurrió un error general al registrar al colaborador. Inténtalo nuevamente.',
-        500
-      )
-    );
+    console.error('Error en la transacción de creación de colaborador:', error);
+
+    // --- 7. Manejo de errores y limpieza (rollback y eliminación de archivos) ---
+    try {
+      if (transaction) {
+        await transaction.rollback(); // Deshacer cambios en la base de datos
+      }
+    } catch (rollbackError) {
+      console.error('Error al hacer rollback:', rollbackError.message);
+    }
+
+    // Eliminar todos los archivos que se subieron exitosamente antes de que fallara la transacción
+    // Usar una sola función consistente para eliminar archivos
+    for (const filePath of uploadedFilePaths) {
+      try {
+        await deleteFileColaborador(filePath); // Usar función consistente
+        console.log(`Archivo eliminado: ${filePath}`);
+      } catch (deleteError) {
+        console.error(
+          `Error al eliminar el archivo ${filePath}:`,
+          deleteError.message
+        );
+        // Continuar con la eliminación de otros archivos, no detener el proceso aquí
+      }
+    }
+
+    // Determinar el mensaje de error para el usuario
+    const errorMessage =
+      error instanceof AppError
+        ? error.message
+        : 'Ocurrió un error general al registrar al colaborador. Inténtalo nuevamente.';
+    const statusCode = error instanceof AppError ? error.statusCode : 500;
+
+    return next(new AppError(errorMessage, statusCode));
   }
+});
+
+export const update = catchAsync(async (req, res, next) => {
+  const transaction = await db.transaction();
+  const uploadedFilePaths = [];
+  const oldFilesToDelete = [];
+
+  try {
+    const { id } = req.params;
+
+    // Verificar que el colaborador existe
+    const { colaborador } = req;
+    // Extraer datos del cuerpo de la solicitud
+    const {
+      nombre_colaborador,
+      apellidos_colaborador,
+      fecha_nacimiento_colaborador,
+      dni_colaborador,
+      telefono_colaborador,
+      correo_colaborador,
+      direccion_colaborador,
+      departamento_colaborador,
+      provincia_colaborador,
+      distrito_colaborador,
+      nombre_contacto_emergencia,
+      apellidos_contacto_emergencia,
+      telefono_contacto_emergencia,
+      vinculo_contacto_emergencia,
+      cargo_laboral_id,
+      nombre_contacto_emergencia2,
+      apellidos_contacto_emergencia2,
+      telefono_contacto_emergencia2,
+      vinculo_contacto_emergencia2,
+      archivos_complementarios_names, // Nombres proporcionados por el usuario para los archivos complementarios
+    } = req.body;
+
+    // --- 1. Comprobaciones de existencia unificadas (excluyendo el registro actual) ---
+    const existenceChecks = [
+      {
+        field: 'dni_colaborador',
+        value: dni_colaborador,
+        message: 'El DNI ya se encuentra registrado.',
+      },
+      {
+        field: 'telefono_colaborador',
+        value: telefono_colaborador,
+        message: 'El número de teléfono ya se encuentra registrado.',
+      },
+      {
+        field: 'correo_colaborador',
+        value: correo_colaborador,
+        message: 'El correo ya se encuentra registrado.',
+      },
+      {
+        field: 'telefono_contacto_emergencia',
+        value: telefono_contacto_emergencia,
+        message:
+          'El teléfono del contacto de emergencia ya se encuentra registrado.',
+      },
+    ];
+
+    for (const check of existenceChecks) {
+      const exists = await Colaboradores.findOne({
+        where: {
+          [check.field]: check.value,
+          id: { [Op.ne]: id },
+        },
+        transaction,
+      });
+      if (exists) {
+        throw new AppError(check.message, 400);
+      }
+    }
+
+    // --- 2. Acceso a archivos subidos por Multer ---
+    const fotoFile = req.files?.['foto_colaborador']?.[0];
+    const cvFile = req.files?.['cv_colaborador']?.[0];
+    const complementaryFiles = req.files?.['archivos_complementarios'] || [];
+
+    // --- 3. Preparar datos para actualización ---
+    const updateData = {
+      nombre_colaborador,
+      apellidos_colaborador,
+      fecha_nacimiento_colaborador,
+      dni_colaborador,
+      telefono_colaborador,
+      correo_colaborador,
+      direccion_colaborador,
+      departamento_colaborador,
+      provincia_colaborador,
+      distrito_colaborador,
+      nombre_contacto_emergencia,
+      apellidos_contacto_emergencia,
+      telefono_contacto_emergencia,
+      vinculo_contacto_emergencia,
+      cargo_laboral_id,
+      nombre_contacto_emergencia2,
+      apellidos_contacto_emergencia2,
+      telefono_contacto_emergencia2,
+      vinculo_contacto_emergencia2,
+    };
+
+    // --- 4. Procesar foto del colaborador si se envía ---
+    if (fotoFile) {
+      try {
+        const nuevaFotoPath = await uploadFileToColaborador(fotoFile);
+        uploadedFilePaths.push(nuevaFotoPath);
+
+        // Marcar foto antigua para eliminación
+        if (colaborador.foto_colaborador) {
+          oldFilesToDelete.push(colaborador.foto_colaborador);
+        }
+
+        updateData.foto_colaborador = nuevaFotoPath;
+      } catch (error) {
+        console.error(
+          'Error al subir la nueva foto del colaborador:',
+          error.response?.data || error.message
+        );
+        throw new AppError(
+          'Error al subir la nueva foto del colaborador. Inténtalo nuevamente.',
+          500
+        );
+      }
+    }
+
+    // --- 5. Procesar CV del colaborador si se envía ---
+    if (cvFile) {
+      try {
+        const nuevoCvPath = await uploadFileToColaborador(cvFile);
+        uploadedFilePaths.push(nuevoCvPath);
+
+        // Marcar CV antiguo para eliminación
+        if (colaborador.cv_colaborador) {
+          oldFilesToDelete.push(colaborador.cv_colaborador);
+        }
+
+        updateData.cv_colaborador = nuevoCvPath;
+      } catch (error) {
+        console.error(
+          'Error al subir el nuevo CV del colaborador:',
+          error.response?.data || error.message
+        );
+        throw new AppError(
+          'Error al subir el nuevo CV del colaborador. Inténtalo nuevamente.',
+          500
+        );
+      }
+    }
+
+    // --- 6. Actualizar el registro del colaborador en la base de datos ---
+    await Colaboradores.update(updateData, {
+      where: { id },
+      transaction,
+    });
+
+    // --- 7. Procesar archivos complementarios si se envían ---
+    if (complementaryFiles.length > 0) {
+      // Obtener archivos complementarios existentes para marcarlos para eliminación
+      const archivosExistentes = await DocCompleColaboradores.findAll({
+        where: { colaborador_id: id },
+        transaction,
+      });
+
+      // Marcar archivos complementarios existentes para eliminación
+      for (const archivo of archivosExistentes) {
+        if (archivo.link_doc_complementario) {
+          oldFilesToDelete.push(archivo.link_doc_complementario);
+        }
+      }
+
+      // Eliminar registros de archivos complementarios existentes
+      await DocCompleColaboradores.destroy({
+        where: { colaborador_id: id },
+        transaction,
+      });
+
+      // Subir nuevos archivos complementarios
+      const uploadComplementaryPromises = complementaryFiles.map(
+        async (file, i) => {
+          const fileName =
+            archivos_complementarios_names?.[i] || file.originalname;
+          try {
+            const filePath = await uploadFileToColaborador(file);
+            uploadedFilePaths.push(filePath);
+            return {
+              colaborador_id: id,
+              nombre_doc_complementario: fileName,
+              link_doc_complementario: filePath,
+            };
+          } catch (error) {
+            console.error(
+              `Error al subir el archivo complementario ${fileName}:`,
+              error.response?.data || error.message
+            );
+            throw new AppError(
+              `Error al subir el archivo complementario ${fileName}.`,
+              500
+            );
+          }
+        }
+      );
+
+      const archivosParaCrear = await Promise.all(uploadComplementaryPromises);
+
+      // Guardar información de nuevos archivos complementarios en la DB
+      if (archivosParaCrear.length > 0) {
+        await DocCompleColaboradores.bulkCreate(archivosParaCrear, {
+          transaction,
+        });
+      }
+    }
+
+    // Si todo fue exitoso, confirmar la transacción
+    await transaction.commit();
+
+    // Eliminar archivos antiguos después de confirmar la transacción
+    for (const filePath of oldFilesToDelete) {
+      try {
+        await deleteFileColaborador(filePath);
+        console.log(`Archivo antiguo eliminado: ${filePath}`);
+      } catch (deleteError) {
+        console.error(
+          `Error al eliminar el archivo antiguo ${filePath}:`,
+          deleteError.message
+        );
+        // No lanzar error aquí, solo registrar el problema
+      }
+    }
+
+    // Obtener el colaborador actualizado
+    const colaboradorActualizado = await Colaboradores.findByPk(id, {
+      include: [
+        {
+          model: DocCompleColaboradores,
+          as: 'documentos_complementarios',
+        },
+      ],
+    });
+
+    // Enviar respuesta de éxito
+    res.status(200).json({
+      status: 'success',
+      message: 'El colaborador se actualizó correctamente.',
+      colaborador: colaboradorActualizado,
+    });
+  } catch (error) {
+    console.error(
+      'Error en la transacción de actualización de colaborador:',
+      error
+    );
+
+    // --- 8. Manejo de errores y limpieza (rollback y eliminación de archivos nuevos) ---
+    try {
+      if (transaction) {
+        await transaction.rollback();
+      }
+    } catch (rollbackError) {
+      console.error('Error al hacer rollback:', rollbackError.message);
+    }
+
+    // Eliminar solo los archivos nuevos que se subieron antes del error
+    for (const filePath of uploadedFilePaths) {
+      try {
+        await deleteFileColaborador(filePath);
+        console.log(`Archivo nuevo eliminado por error: ${filePath}`);
+      } catch (deleteError) {
+        console.error(
+          `Error al eliminar el archivo nuevo ${filePath}:`,
+          deleteError.message
+        );
+      }
+    }
+
+    // Determinar el mensaje de error para el usuario
+    const errorMessage =
+      error instanceof AppError
+        ? error.message
+        : 'Ocurrió un error general al actualizar al colaborador. Inténtalo nuevamente.';
+    const statusCode = error instanceof AppError ? error.statusCode : 500;
+
+    return next(new AppError(errorMessage, statusCode));
+  }
+});
+
+export const activarColaborador = catchAsync(async (req, res) => {
+  const { colaborador } = req;
+
+  await colaborador.update({ estado: 'ACTIVO' });
+
+  return res.status(200).json({
+    status: 'success',
+    message: `The colaborador with id: ${colaborador.id} has been ACTIVO`,
+  });
+});
+
+export const deleteElement = catchAsync(async (req, res) => {
+  const { colaborador } = req;
+
+  await colaborador.update({ estado: 'INACTIVO' });
+
+  return res.status(200).json({
+    status: 'success',
+    message: `The colaborador with id: ${colaborador.id} has been deleted`,
+  });
 });
