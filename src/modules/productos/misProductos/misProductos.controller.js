@@ -68,7 +68,7 @@ export const findAllKardex = catchAsync(async (req, res, next) => {
               ? { fechaEmision: { [Op.between]: [startDate, endDate] } }
               : {}),
           },
-          required: false,
+          required: true,
           include: [
             {
               model: ComprobantesElectronicos,
