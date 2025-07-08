@@ -17,6 +17,12 @@ router.get(
   vacaionesSolicitadasController.findAllPeriodo
 );
 
+router.get(
+  '/colaborador/:id',
+  vacacionesMiddleware.validExistVacaciones,
+  vacaionesSolicitadasController.findAllColaborador
+);
+
 router.get('/', vacaionesSolicitadasController.findAll);
 
 router

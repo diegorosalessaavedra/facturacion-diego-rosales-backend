@@ -13,15 +13,38 @@ import {
 import { Op } from 'sequelize';
 
 export const findAll = catchAsync(async (req, res, next) => {
+  const { nombreNumeroDoc, cargoLaboral } = req.query;
+
+  // Filtro base
+  const whereCliente = {
+    estado: 'ACTIVO',
+  };
+
+  // Búsqueda por nombre, apellido o DNI
+  if (nombreNumeroDoc && nombreNumeroDoc.length > 1) {
+    const nombreBuscado = `%${nombreNumeroDoc}%`;
+
+    whereCliente[Op.or] = [
+      { nombre_colaborador: { [Op.iLike]: nombreBuscado } },
+      { apellidos_colaborador: { [Op.iLike]: nombreBuscado } },
+      { dni_colaborador: { [Op.iLike]: nombreBuscado } },
+    ];
+  }
+
+  // Filtro por cargo laboral
+  if (cargoLaboral && cargoLaboral !== 'todos') {
+    whereCliente.cargo_laboral_id = cargoLaboral;
+  }
+
   const colaboradores = await Colaboradores.findAll({
-    where: { estado: 'ACTIVO' },
+    where: whereCliente,
     include: [
       { model: CargoLaboral, as: 'cargo_laboral' },
       { model: DocCompleColaboradores, as: 'documentos_complementarios' },
       {
         model: Contratos,
         as: 'contratos',
-        separate: true, // Opcional: carga contratos aparte para poder ordenarlos bien
+        separate: true,
         order: [['fecha_final', 'DESC']],
       },
       { model: Memos, as: 'memos' },
@@ -36,15 +59,37 @@ export const findAll = catchAsync(async (req, res, next) => {
 });
 
 export const findAllInactivos = catchAsync(async (req, res, next) => {
+  const { nombreNumeroDoc, cargoLaboral } = req.query;
+
+  // Filtro base
+  const whereCliente = {
+    estado: 'INACTIVO',
+  };
+
+  // Búsqueda por nombre, apellido o DNI
+  if (nombreNumeroDoc && nombreNumeroDoc.length > 1) {
+    const nombreBuscado = `%${nombreNumeroDoc}%`;
+
+    whereCliente[Op.or] = [
+      { nombre_colaborador: { [Op.iLike]: nombreBuscado } },
+      { apellidos_colaborador: { [Op.iLike]: nombreBuscado } },
+      { dni_colaborador: { [Op.iLike]: nombreBuscado } },
+    ];
+  }
+
+  if (cargoLaboral && cargoLaboral !== 'todos') {
+    whereCliente.cargo_laboral_id = cargoLaboral;
+  }
+
   const colaboradores = await Colaboradores.findAll({
-    where: { estado: 'INACTIVO' },
+    where: whereCliente,
     include: [
       { model: CargoLaboral, as: 'cargo_laboral' },
       { model: DocCompleColaboradores, as: 'documentos_complementarios' },
       {
         model: Contratos,
         as: 'contratos',
-        separate: true, // Opcional: carga contratos aparte para poder ordenarlos bien
+        separate: true,
         order: [['fecha_final', 'DESC']],
       },
       { model: Memos, as: 'memos' },

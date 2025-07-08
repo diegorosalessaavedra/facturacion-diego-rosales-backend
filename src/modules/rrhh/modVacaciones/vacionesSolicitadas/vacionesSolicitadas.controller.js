@@ -25,6 +25,20 @@ export const findAllPeriodo = catchAsync(async (req, res, next) => {
   });
 });
 
+export const findAllColaborador = catchAsync(async (req, res, next) => {
+  const { id: colaborador_id } = req.params;
+
+  const vacionesSolicitadas = await VacionesSolicitadas.findAll({
+    where: { colaborador_id },
+  });
+
+  return res.status(200).json({
+    status: 'Success',
+    results: vacionesSolicitadas.length,
+    vacionesSolicitadas,
+  });
+});
+
 export const findAll = catchAsync(async (req, res, next) => {
   const vacionesSolicitadas = await VacionesSolicitadas.findAll({
     include: [
