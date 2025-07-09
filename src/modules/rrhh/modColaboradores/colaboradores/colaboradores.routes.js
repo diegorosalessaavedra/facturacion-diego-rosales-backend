@@ -19,6 +19,12 @@ router.get(
   colaboradoresController.activarColaborador
 );
 
+router.delete(
+  '/desactivar/:id',
+  colaboradoresMiddleware.validExistColaborador,
+  colaboradoresController.desactivarColaborador
+);
+
 // Crear nuevo colaborador con archivos
 router.post(
   '/',

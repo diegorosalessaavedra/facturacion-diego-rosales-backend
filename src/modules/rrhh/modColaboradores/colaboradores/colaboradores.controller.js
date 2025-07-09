@@ -629,10 +629,21 @@ export const activarColaborador = catchAsync(async (req, res) => {
   });
 });
 
-export const deleteElement = catchAsync(async (req, res) => {
+export const desactivarColaborador = catchAsync(async (req, res) => {
   const { colaborador } = req;
 
   await colaborador.update({ estado: 'INACTIVO' });
+
+  return res.status(200).json({
+    status: 'success',
+    message: `The colaborador with id: ${colaborador.id} has been deleted`,
+  });
+});
+
+export const deleteElement = catchAsync(async (req, res) => {
+  const { colaborador } = req;
+
+  await colaborador.destroy();
 
   return res.status(200).json({
     status: 'success',
