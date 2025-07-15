@@ -12,7 +12,7 @@ import { OrdenesCompra } from './ordenesCompra.model.js';
 import { MisProductos } from '../../productos/misProductos/misProductos.model.js';
 
 export const findAll = catchAsync(async (req, res, next) => {
-  const { tipoFiltro, dataFiltro, fechaInicial, fechaFinal } = req.query;
+  const { tipoFiltro, dataFiltro, fechaInicio, fechaFinal } = req.query;
 
   let whereVendedor = {};
   let whereProveedor = {};
@@ -33,13 +33,14 @@ export const findAll = catchAsync(async (req, res, next) => {
   }
 
   if (tipoFiltro && tipoFiltro === 'fechaEmision') {
+    console.log(`Fecha Inicio: ${fechaInicio}, Fecha Final: ${fechaFinal}`);
     whereFechas.fechaEmision = {
-      [Op.between]: [fechaInicial, fechaFinal],
+      [Op.between]: [fechaInicio, fechaFinal],
     };
   }
   if (tipoFiltro && tipoFiltro === 'fechaVencimiento') {
     whereFechas.fechaVencimiento = {
-      [Op.between]: [fechaInicial, fechaFinal],
+      [Op.between]: [fechaInicio, fechaFinal],
     };
   }
 
