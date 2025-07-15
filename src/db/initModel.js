@@ -29,6 +29,12 @@ import { VacionesSolicitadas } from '../modules/rrhh/modVacaciones/vacionesSolic
 import { Contratos } from '../modules/rrhh/modColaboradores/contratos/contratos.model.js';
 import { Memos } from '../modules/rrhh/modColaboradores/memos/memos.model.js';
 import { DescansoMedico } from '../modules/rrhh/modDescansoMedico/descansoMedico/descansoMedico.model.js';
+import { Huevos } from '../modules/productos/huevos/huevos.model.js';
+import { IngresoHuevos } from '../modules/compras/ingresoHuevos/ingresoHuevos.model.js';
+import { Origen } from '../modules/clientesProveedores/origen/origen.model.js';
+import { CostosProduccion } from '../modules/costos/costosProduccion/costosProduccion.model.js';
+import { PagosIngresoHuevos } from '../modules/compras/pagosIngresoHuevos/pagosIngresoHuevos.model.js';
+import { MetodosPago } from '../modules/ajustes/metodosPagos/metodosPago.model.js';
 
 const initModel = () => {
   Cotizaciones.belongsTo(User, { foreignKey: 'usuarioId', as: 'usario' });
@@ -315,6 +321,53 @@ const initModel = () => {
     as: 'colaborador',
   });
   // rrhh
+
+  Origen.hasMany(IngresoHuevos, {
+    foreignKey: 'origen_id',
+    as: 'huevos',
+  });
+
+  IngresoHuevos.belongsTo(Origen, {
+    foreignKey: 'origen_id',
+    as: 'origen',
+  });
+
+  IngresoHuevos.hasMany(Huevos, {
+    foreignKey: 'ingreso_huevos_id',
+    as: 'huevos',
+  });
+
+  Huevos.belongsTo(IngresoHuevos, {
+    foreignKey: 'ingreso_huevos_id',
+    as: 'ingreso_huevos',
+  });
+
+  IngresoHuevos.hasMany(CostosProduccion, {
+    foreignKey: 'ingreso_huevo_id',
+    as: 'costo_produccion',
+  });
+
+  CostosProduccion.belongsTo(IngresoHuevos, {
+    foreignKey: 'ingreso_huevo_id',
+  });
+
+  IngresoHuevos.hasMany(PagosIngresoHuevos, {
+    foreignKey: 'ingreso_huevo_id',
+    as: 'pagos',
+  });
+
+  PagosIngresoHuevos.belongsTo(IngresoHuevos, {
+    foreignKey: 'ingreso_huevo_id',
+  });
+
+  MetodosPago.hasMany(PagosIngresoHuevos, {
+    foreignKey: 'ingreso_huevo_id',
+    as: 'pagos',
+  });
+
+  PagosIngresoHuevos.belongsTo(MetodosPago, {
+    foreignKey: 'ingreso_huevo_id',
+  });
 };
 
 export { initModel };
