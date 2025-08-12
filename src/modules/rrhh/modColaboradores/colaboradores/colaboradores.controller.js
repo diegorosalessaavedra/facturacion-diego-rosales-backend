@@ -16,14 +16,11 @@ export const findAll = catchAsync(async (req, res, next) => {
   const { nombreNumeroDoc, cargoLaboral } = req.query;
 
   // Filtro base
-  const whereCliente = {
-    estado: 'ACTIVO',
-  };
+  const whereCliente = { estado: 'ACTIVO' };
 
   // Búsqueda por nombre, apellido o DNI
   if (nombreNumeroDoc && nombreNumeroDoc.length > 1) {
     const nombreBuscado = `%${nombreNumeroDoc}%`;
-
     whereCliente[Op.or] = [
       { nombre_colaborador: { [Op.iLike]: nombreBuscado } },
       { apellidos_colaborador: { [Op.iLike]: nombreBuscado } },
@@ -45,11 +42,49 @@ export const findAll = catchAsync(async (req, res, next) => {
         model: Contratos,
         as: 'contratos',
         separate: true,
-        order: [['fecha_final', 'DESC']],
+        order: [[db.literal("TO_DATE(fecha_final, 'DD/MM/YYYY')"), 'DESC']],
       },
       { model: Memos, as: 'memos' },
     ],
   });
+
+  // Función para convertir fecha DD/MM/YYYY → Date
+  const parseFecha = (fecha) => {
+    if (!fecha) return null;
+    const [dia, mes, anio] = fecha.split('/');
+    return new Date(`${anio}-${mes}-${dia}`);
+  };
+
+  // Función para calcular días restantes
+  const calcularDiasRestantes = (fechaFinal) => {
+    const fin = parseFecha(fechaFinal);
+    const ahora = new Date();
+    if (!fin) return null;
+    return Math.ceil((fin - ahora) / (1000 * 60 * 60 * 24));
+  };
+
+  // Lista de promesas para guardar cambios
+  const cambiosEstado = [];
+
+  for (const colaborador of colaboradores) {
+    for (const contrato of colaborador.contratos) {
+      const diasRestantes = calcularDiasRestantes(contrato.fecha_final);
+
+      if (
+        diasRestantes !== null &&
+        diasRestantes < 0 &&
+        contrato.estado_contrato !== 'expirado'
+      ) {
+        contrato.estado_contrato = 'expirado';
+        cambiosEstado.push(contrato.save());
+      }
+    }
+  }
+
+  // Guardar todos los cambios de una sola vez
+  if (cambiosEstado.length > 0) {
+    await Promise.all(cambiosEstado);
+  }
 
   return res.status(200).json({
     status: 'success',
