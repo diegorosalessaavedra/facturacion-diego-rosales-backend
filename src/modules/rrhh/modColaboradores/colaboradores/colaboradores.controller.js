@@ -46,6 +46,7 @@ export const findAll = catchAsync(async (req, res, next) => {
       },
       { model: Memos, as: 'memos' },
     ],
+    order: [['apellidos_colaborador', 'ASC']],
   });
 
   // Función para convertir fecha DD/MM/YYYY → Date
@@ -380,6 +381,10 @@ export const update = catchAsync(async (req, res, next) => {
 
     // Verificar que el colaborador existe
     const { colaborador } = req;
+    if (!colaborador) {
+      throw new AppError('Colaborador no encontrado.', 404);
+    }
+
     // Extraer datos del cuerpo de la solicitud
     const {
       nombre_colaborador,
@@ -401,8 +406,10 @@ export const update = catchAsync(async (req, res, next) => {
       apellidos_contacto_emergencia2,
       telefono_contacto_emergencia2,
       vinculo_contacto_emergencia2,
-      archivos_complementarios_names, // Nombres proporcionados por el usuario para los archivos complementarios
+      archivos_complementarios_names,
+      deletesDocsId,
     } = req.body;
+    console.log(deletesDocsId);
 
     // --- 1. Comprobaciones de existencia unificadas (excluyendo el registro actual) ---
     const existenceChecks = [
@@ -429,16 +436,20 @@ export const update = catchAsync(async (req, res, next) => {
       },
     ];
 
+    // Validar solo campos que tengan valor
     for (const check of existenceChecks) {
-      const exists = await Colaboradores.findOne({
-        where: {
-          [check.field]: check.value,
-          id: { [Op.ne]: id },
-        },
-        transaction,
-      });
-      if (exists) {
-        throw new AppError(check.message, 400);
+      if (check.value) {
+        // 👈 Solo validar si hay valor
+        const exists = await Colaboradores.findOne({
+          where: {
+            [check.field]: check.value,
+            id: { [Op.ne]: id },
+          },
+          transaction,
+        });
+        if (exists) {
+          throw new AppError(check.message, 400);
+        }
       }
     }
 
@@ -469,6 +480,13 @@ export const update = catchAsync(async (req, res, next) => {
       telefono_contacto_emergencia2,
       vinculo_contacto_emergencia2,
     };
+
+    // Remover campos undefined para evitar sobrescribir con null
+    Object.keys(updateData).forEach((key) => {
+      if (updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    });
 
     // --- 4. Procesar foto del colaborador si se envía ---
     if (fotoFile) {
@@ -524,68 +542,92 @@ export const update = catchAsync(async (req, res, next) => {
       transaction,
     });
 
-    // --- 7. Procesar archivos complementarios si se envían ---
-    if (complementaryFiles.length > 0) {
-      // Obtener archivos complementarios existentes para marcarlos para eliminación
-      const archivosExistentes = await DocCompleColaboradores.findAll({
-        where: { colaborador_id: id },
-        transaction,
-      });
+    // --- 7. Procesar eliminación de documentos complementarios ---
+    if (
+      deletesDocsId &&
+      Array.isArray(deletesDocsId) &&
+      deletesDocsId.length > 0
+    ) {
+      for (const idDoc of deletesDocsId) {
+        try {
+          const archivo = await DocCompleColaboradores.findOne({
+            where: { id: idDoc },
+            transaction,
+          });
 
-      // Marcar archivos complementarios existentes para eliminación
-      for (const archivo of archivosExistentes) {
-        if (archivo.link_doc_complementario) {
-          oldFilesToDelete.push(archivo.link_doc_complementario);
-        }
-      }
-
-      // Eliminar registros de archivos complementarios existentes
-      await DocCompleColaboradores.destroy({
-        where: { colaborador_id: id },
-        transaction,
-      });
-
-      // Subir nuevos archivos complementarios
-      const uploadComplementaryPromises = complementaryFiles.map(
-        async (file, i) => {
-          const fileName =
-            archivos_complementarios_names?.[i] || file.originalname;
-          try {
-            const filePath = await uploadFileToColaborador(file);
-            uploadedFilePaths.push(filePath);
-            return {
-              colaborador_id: id,
-              nombre_doc_complementario: fileName,
-              link_doc_complementario: filePath,
-            };
-          } catch (error) {
-            console.error(
-              `Error al subir el archivo complementario ${fileName}:`,
-              error.response?.data || error.message
-            );
-            throw new AppError(
-              `Error al subir el archivo complementario ${fileName}.`,
-              500
+          if (archivo) {
+            if (archivo.link_doc_complementario) {
+              oldFilesToDelete.push(archivo.link_doc_complementario);
+            }
+            await archivo.destroy({ transaction }); // 👈 Agregar transaction
+          } else {
+            console.warn(
+              `Documento con ID ${idDoc} no encontrado para eliminar`
             );
           }
+        } catch (error) {
+          console.error(`Error al eliminar documento ${idDoc}:`, error.message);
+          throw new AppError(
+            `Error al eliminar documento complementario.`,
+            500
+          );
         }
-      );
-
-      const archivosParaCrear = await Promise.all(uploadComplementaryPromises);
-
-      // Guardar información de nuevos archivos complementarios en la DB
-      if (archivosParaCrear.length > 0) {
-        await DocCompleColaboradores.bulkCreate(archivosParaCrear, {
-          transaction,
-        });
       }
     }
 
-    // Si todo fue exitoso, confirmar la transacción
+    // --- 8. Procesar archivos complementarios nuevos ---
+    if (complementaryFiles.length > 0) {
+      try {
+        const uploadComplementaryPromises = complementaryFiles.map(
+          async (file, i) => {
+            const fileName =
+              archivos_complementarios_names?.[i] || file.originalname;
+
+            try {
+              const filePath = await uploadFileToColaborador(file);
+              uploadedFilePaths.push(filePath);
+              return {
+                colaborador_id: id,
+                nombre_doc_complementario: fileName,
+                link_doc_complementario: filePath,
+              };
+            } catch (error) {
+              console.error(
+                `Error al subir el archivo complementario ${fileName}:`,
+                error.response?.data || error.message
+              );
+              throw new AppError(
+                `Error al subir el archivo complementario ${fileName}.`,
+                500
+              );
+            }
+          }
+        );
+
+        const archivosParaCrear = await Promise.all(
+          uploadComplementaryPromises
+        );
+
+        // Guardar información de nuevos archivos complementarios en la DB
+        if (archivosParaCrear.length > 0) {
+          await DocCompleColaboradores.bulkCreate(archivosParaCrear, {
+            transaction,
+          });
+        }
+      } catch (error) {
+        console.error(
+          'Error al procesar archivos complementarios:',
+          error.message
+        );
+        throw error; // Re-lanzar para que sea manejado por el catch principal
+      }
+    }
+
+    // --- 9. Si todo fue exitoso, confirmar la transacción ---
     await transaction.commit();
 
-    // Eliminar archivos antiguos después de confirmar la transacción
-    for (const filePath of oldFilesToDelete) {
+    // --- 10. Eliminar archivos antiguos después de confirmar la transacción ---
+    const deletePromises = oldFilesToDelete.map(async (filePath) => {
       try {
         await deleteFileColaborador(filePath);
         console.log(`Archivo antiguo eliminado: ${filePath}`);
@@ -596,9 +638,12 @@ export const update = catchAsync(async (req, res, next) => {
         );
         // No lanzar error aquí, solo registrar el problema
       }
-    }
+    });
 
-    // Obtener el colaborador actualizado
+    // Ejecutar eliminaciones en paralelo pero sin esperar
+    Promise.allSettled(deletePromises);
+
+    // --- 11. Obtener el colaborador actualizado ---
     const colaboradorActualizado = await Colaboradores.findByPk(id, {
       include: [
         {
@@ -608,7 +653,7 @@ export const update = catchAsync(async (req, res, next) => {
       ],
     });
 
-    // Enviar respuesta de éxito
+    // --- 12. Enviar respuesta de éxito ---
     res.status(200).json({
       status: 'success',
       message: 'El colaborador se actualizó correctamente.',
@@ -620,9 +665,10 @@ export const update = catchAsync(async (req, res, next) => {
       error
     );
 
-    // --- 8. Manejo de errores y limpieza (rollback y eliminación de archivos nuevos) ---
+    // --- 13. Manejo de errores y limpieza ---
     try {
-      if (transaction) {
+      // Rollback solo si la transacción no está terminada
+      if (transaction && !transaction.finished) {
         await transaction.rollback();
       }
     } catch (rollbackError) {
@@ -630,7 +676,7 @@ export const update = catchAsync(async (req, res, next) => {
     }
 
     // Eliminar solo los archivos nuevos que se subieron antes del error
-    for (const filePath of uploadedFilePaths) {
+    const cleanupPromises = uploadedFilePaths.map(async (filePath) => {
       try {
         await deleteFileColaborador(filePath);
         console.log(`Archivo nuevo eliminado por error: ${filePath}`);
@@ -640,7 +686,10 @@ export const update = catchAsync(async (req, res, next) => {
           deleteError.message
         );
       }
-    }
+    });
+
+    // Ejecutar limpieza en paralelo
+    await Promise.allSettled(cleanupPromises);
 
     // Determinar el mensaje de error para el usuario
     const errorMessage =
